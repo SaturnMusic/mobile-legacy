@@ -1,6 +1,7 @@
 # Saturn Mobile
 ## Freezer Reborn
 ### Your go-to **ToS Compliant** Custom Deezer Client
+#⚠️⚠️ THIS IS A BETA AND THEREFORE A DEBUG BUILD ⚠️⚠️
 ### ⚠️ A premium account is required in order to use this client
 
 # Featuring:
