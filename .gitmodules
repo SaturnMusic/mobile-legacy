@@ -1,0 +1,6 @@
+[submodule "audio_service"]
+	path = audio_service
+	url = https://github.com/SaturnMusic/audio_service.git
+[submodule "just_audio"]
+	path = just_audio
+	url = https://github.com/SaturnMusic/just_audio
