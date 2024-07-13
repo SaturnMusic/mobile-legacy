@@ -19,6 +19,7 @@ import 'cached_image.dart';
 import 'tiles.dart';
 import 'menu.dart';
 
+
 class AlbumDetails extends StatefulWidget {
 
   final Album album;

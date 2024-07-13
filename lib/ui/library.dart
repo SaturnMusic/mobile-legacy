@@ -22,6 +22,7 @@ import 'settings_screen.dart';
 import '../api/spotify.dart';
 import '../api/download.dart';
 
+
 class LibraryAppBar extends StatelessWidget implements PreferredSizeWidget {
 
   @override

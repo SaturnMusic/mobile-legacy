@@ -17,6 +17,7 @@ import 'package:Saturn/translations.i18n.dart';
 import 'dart:io';
 import 'dart:async';
 
+
 DownloadManager downloadManager = DownloadManager();
 
 class DownloadManager {

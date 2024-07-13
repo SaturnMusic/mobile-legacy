@@ -10,6 +10,7 @@ import 'dart:io';
 
 import 'package:url_launcher/url_launcher.dart';
 
+
 class SpotifyScrapper {
 
   //Parse spotify URL to URI (spotify:track:1234)

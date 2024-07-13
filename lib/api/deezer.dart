@@ -15,6 +15,7 @@ import 'dart:async';
 import '../settings.dart';
 import '../main.dart';
 
+
 DeezerAPI deezerAPI = DeezerAPI();
 
 class DeezerAPI {

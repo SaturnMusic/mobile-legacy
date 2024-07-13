@@ -29,6 +29,7 @@ import 'dart:ui';
 import 'dart:convert';
 import 'dart:async';
 
+
 //Changing item in queue view and pressing back causes the pageView to skip song
 bool pageViewLock = false;
 

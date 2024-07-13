@@ -20,6 +20,7 @@ import '../api/definitions.dart';
 import 'error.dart';
 
 
+
 openScreenByURL(BuildContext context, String url) async {
   DeezerLinkResponse res = await deezerAPI.parseLink(url);
   if (res == null) return;
@@ -219,7 +220,7 @@ class _SearchScreenState extends State<SearchScreen> {
             ),
           ),
           if (_loading)
-            LinearProgressIndicator(),
+            LinearProgressIndicator(color: Theme.of(context).primaryColor,),
           freezerDivider(),
 
           //"Browse" Cards

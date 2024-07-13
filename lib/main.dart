@@ -26,6 +26,7 @@ import 'settings.dart';
 import 'ui/home_screen.dart';
 import 'ui/player_bar.dart';
 
+
 Function updateTheme;
 Function logOut;
 GlobalKey<NavigatorState> mainNavigatorKey = GlobalKey<NavigatorState>();

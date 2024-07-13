@@ -5,7 +5,7 @@
 #include <openssl/md5.h>
 #include <openssl/blowfish.h>
 
-JNIEXPORT void JNICALL Java_f_f_freezer_Deezer_decryptFile(JNIEnv *env, jobject obj, jstring jTrackId, jstring jInputFilename, jstring jOutputFilename) {
+JNIEXPORT void JNICALL Java_s_s_saturn_Deezer_decryptFile(JNIEnv *env, jobject obj, jstring jTrackId, jstring jInputFilename, jstring jOutputFilename) {
     //Get parameters from jstring to base C
     const char *inputFilename = (*env)->GetStringUTFChars(env, jInputFilename, NULL);
     const char *outputFilename = (*env)->GetStringUTFChars(env, jOutputFilename, NULL);

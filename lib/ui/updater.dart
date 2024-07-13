@@ -18,6 +18,7 @@ import 'dart:convert';
 import 'package:version/version.dart';
 
 
+
 class UpdaterScreen extends StatefulWidget {
   @override
   _UpdaterScreenState createState() => _UpdaterScreenState();

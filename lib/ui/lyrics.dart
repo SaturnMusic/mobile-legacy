@@ -11,6 +11,7 @@ import 'package:Saturn/ui/elements.dart';
 import 'package:Saturn/translations.i18n.dart';
 import 'package:Saturn/ui/error.dart';
 
+
 class LyricsScreen extends StatefulWidget {
 
   final Lyrics lyrics;
