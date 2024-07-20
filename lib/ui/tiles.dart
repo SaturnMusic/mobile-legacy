@@ -369,6 +369,51 @@ class SmartTrackListTile extends StatelessWidget {
   }
 }
 
+class FlowTile extends StatelessWidget {
+
+  final FlowHandler Flow;
+  final Function onTap;
+  final Function onHold;
+  FlowTile(this.Flow, {this.onHold, this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: 150,
+      child: Container(
+      child: InkWell(
+        onTap: onTap,
+        onLongPress: onHold,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: <Widget>[
+            Container(height: 4,),
+                  CachedImage(
+                    width: 100,
+                    height: 100,
+                    url: Flow.cover.thumb,
+                    
+                    circular: true,
+                  ),
+                  Container(height: 8,),
+                  Text(
+                      Flow.title,
+                      maxLines: 1,
+                      textAlign: TextAlign.center,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 14.0
+                   ),
+              ),
+              Container(height: 4,),
+            ],
+          ),
+        ),
+      )
+    );
+  }
+}
+
 class AlbumCard extends StatelessWidget {
 
   final Album album;
@@ -481,6 +526,7 @@ class ShowCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
+      height: 180.0,
       child: InkWell(
         onTap: onTap,
         onLongPress: onHold,

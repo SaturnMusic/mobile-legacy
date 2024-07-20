@@ -6,8 +6,10 @@ import 'package:Saturn/ui/cached_image.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:json_annotation/json_annotation.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:ext_storage/ext_storage.dart';
 import 'package:path/path.dart' as p;
 import 'package:flutter/material.dart';
+
 
 import 'dart:io';
 import 'dart:convert';
@@ -198,20 +200,12 @@ class Settings {
       String data = await f.readAsString();
       return Settings.fromJson(jsonDecode(data));
     }
-
-  Settings s = Settings.fromJson({});
-  // Set default path, because async
-  final directory = await getExternalStorageDirectory();
-  if (directory != null) {
-    s.downloadPath = p.join(directory.path, 'Music');
-  } else {
-    // Handle the case where the directory is null
-    // You might want to set a default path or throw an error
-    s.downloadPath = '/storage/emulated/0/Music'; // Replace with your default path
+    Settings s = Settings.fromJson({});
+    //Set default path, because async
+    s.downloadPath = (await ExtStorage.getExternalStoragePublicDirectory(ExtStorage.DIRECTORY_MUSIC));
+    s.save();
+    return s;
   }
-  s.save();
-  return s;
-}
 
   Future save() async {
     File f = File(await getPath());

@@ -6,6 +6,7 @@ import 'package:intl/intl.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as p;
 import 'package:Saturn/translations.i18n.dart';
+import 'package:flutter/foundation.dart';
 
 import 'dart:convert';
 import 'dart:io';
@@ -442,6 +443,34 @@ class ImageDetails {
   Map<String, dynamic> toJson() => _$ImageDetailsToJson(this);
 }
 
+class FlowImage {
+  String fullUrl;
+  String thumbUrl;
+
+  FlowImage({this.fullUrl, this.thumbUrl});
+
+  //Get full/thumb with fallback
+  String get full => fullUrl??thumbUrl;
+  String get thumb => thumbUrl??fullUrl;
+
+  //JSON
+  factory FlowImage.fromPrivateString(String art, {String type='cover'}) => FlowImage(
+    fullUrl: 'https://e-cdns-images.dzcdn.net/images/$type/$art/1000x1000-000000-80-0-0.png',
+    thumbUrl: 'https://e-cdns-images.dzcdn.net/images/$type/$art/140x140-000000-80-0-0.png'
+  );
+    factory FlowImage.fromPrivateString2(String art, {String type='cover'}) => FlowImage(
+    fullUrl: 'https://e-cdns-images.dzcdn.net/images/$type/$art/1000x1000-000000-80-0-0.png',
+    thumbUrl: 'https://e-cdns-images.dzcdn.net/images/$type/$art/140x140-000000-80-0-0.png'
+  );
+  factory FlowImage.fromPrivateJson(Map<dynamic, dynamic> json) => FlowImage.fromPrivateString2(
+    json['dynamicPageIcon'],
+    type: 'cover'
+  );
+
+  factory FlowImage.fromJson(Map<String, dynamic> json) => _$FlowImageFromJson(json);
+  Map<String, dynamic> toJson() => _$FlowImageToJson(this);
+}
+
 class SearchResults {
   List<Track> tracks;
   List<Album> albums;
@@ -567,6 +596,32 @@ class SmartTrackList {
 }
 
 @JsonSerializable()
+class FlowHandler {
+  String id;
+  String title;
+  String subtitle;
+  String description;
+  int trackCount;
+  List<Track> tracks;
+  FlowImage cover;
+
+  FlowHandler({this.id, this.title, this.description, this.trackCount, this.tracks, this.cover, this.subtitle});
+
+  //JSON
+  factory FlowHandler.fromPrivateJson(Map<dynamic, dynamic> json, {Map<dynamic, dynamic> songsJson = const {}}) => FlowHandler(
+    id: json['id'],
+    title: json['title'],
+    description: json['description'],
+    trackCount: json['NB_SONG']??(songsJson['total']),
+    tracks: (songsJson['data']??[]).map<Track>((t) => Track.fromPrivateJson(t)).toList(),
+    cover: FlowImage.fromPrivateJson(json['assets'])
+  );
+
+  factory FlowHandler.fromJson(Map<String, dynamic> json) => _$gayhandler(json);
+  Map<String, dynamic> toJson() => _$gayerhandler(this);
+}
+
+@JsonSerializable()
 class HomePage {
 
   List<HomePageSection> sections;
@@ -645,7 +700,8 @@ class HomePageSection {
         hps.layout = HomePageSectionLayout.GRID;
         break;
       default:
-        return null;
+        hps.layout = HomePageSectionLayout.ROW;
+        break;
     }
 
     //Parse items
@@ -674,6 +730,8 @@ class HomePageItem {
     switch (type) {
       //Smart Track List
       case 'flow':
+        // debugPrint(json['data']);
+        return HomePageItem(type: HomePageItemType.FLOW, value: FlowHandler.fromPrivateJson(json['data']));
       case 'smarttracklist':
         return HomePageItem(type: HomePageItemType.SMARTTRACKLIST, value: SmartTrackList.fromPrivateJson(json['data']));
       case 'playlist':
@@ -694,6 +752,8 @@ class HomePageItem {
   factory HomePageItem.fromJson(Map<String, dynamic> json) {
     String _t = json['type'];
     switch (_t) {
+      case 'FLOW':
+        return HomePageItem(type: HomePageItemType.FLOW, value: FlowHandler.fromJson(json['value']));
       case 'SMARTTRACKLIST':
         return HomePageItem(type: HomePageItemType.SMARTTRACKLIST, value: SmartTrackList.fromJson(json['value']));
       case 'PLAYLIST':
@@ -759,6 +819,7 @@ factory DeezerChannel.fromPrivateJson(Map<dynamic, dynamic> json) {
 }
 
 enum HomePageItemType {
+  FLOW,
   SMARTTRACKLIST,
   PLAYLIST,
   ARTIST,

@@ -375,32 +375,36 @@ class DeezerAPI {
 
     Map data = await callApi('page.get', gatewayInput: jsonEncode({
       "PAGE": "home",
-      "VERSION": "2.3",
-      "SUPPORT": {
-        /*
-        "deeplink-list": ["deeplink"],
-        "list": ["episode"],
-        "grid-preview-one": grid,
-        "grid-preview-two": grid,
-        "slideshow": grid,
-        "message": ["call_onboarding"],
-        */
-        "grid": grid,
-        "horizontal-grid": grid,
-        "item-highlight": ["radio"],
-        "large-card": ["album", "playlist", "show", "video-link"],
-        "ads": [] //Nope
+      'VERSION': '2.5',
+      'SUPPORT': {
+          'ads': [ /* 'native' */ ], //None
+          'deeplink-list': [ 'deeplink' ],
+          'event-card': [ 'live-event' ],
+          'grid-preview-one': grid,
+          'grid-preview-two': grid,
+          'grid': grid,
+          'horizontal-grid': grid,            
+          'horizontal-list': [ 'track', 'song' ],
+          'item-highlight': [ 'radio' ],
+          'large-card': ['album', 'external-link', 'playlist', 'show', 'video-link'],
+          'list': [ 'episode' ],
+          'message': [ 'call_onboarding' ],
+          'mini-banner': [ 'external-link' ],
+          'slideshow':        [ 'album', 'artist', 'channel', 'external-link', 'flow', 'livestream', 'playlist', 'show', 'smarttracklist', 'user', 'video-link' ],            
+          'small-horizontal-grid': [ 'flow' ],
+          'long-card-horizontal-grid': grid,
+          'filterable-grid': [ 'flow' ]
       },
-      "LANG": settings.deezerLanguage??'en',
-      "OPTIONS": []
+      'LANG': settings.deezerLanguage??'en',
+      'OPTIONS': [ 'deeplink_newsandentertainment', 'deeplink_subscribeoffer' ]
     }));
-      debugPrint('API response2: $data');
+  //     debugPrint('API response2: $data');
       
-  // Convert the response to a JSON string for logging
-  String jsonString = jsonEncode(data);
+  // // Convert the response to a JSON string for logging
+  // String jsonString = jsonEncode(data);
 
-  // Use debugPrint for long strings
-  debugPrintLongString(jsonString);
+  // // Use debugPrint for long strings
+  // debugPrintLongString(jsonString);
 
     return HomePage.fromPrivateJson(data['results']);
   }
@@ -435,32 +439,36 @@ void debugPrintLongString(String text) {
     List grid = ['album', 'artist', 'channel', 'flow', 'playlist', 'radio', 'show', 'smarttracklist', 'track', 'user'];
     Map data = await callApi('page.get', gatewayInput: jsonEncode({
       'PAGE': target,
-      "VERSION": "2.3",
-      "SUPPORT": {
-        /*
-        "deeplink-list": ["deeplink"],
-        "list": ["episode"],
-        "grid-preview-one": grid,
-        "grid-preview-two": grid,
-        "slideshow": grid,
-        "message": ["call_onboarding"],
-        */
-        "grid": grid,
-        "horizontal-grid": grid,
-        "item-highlight": ["radio"],
-        "large-card": ["album", "playlist", "show", "video-link"],
-        "ads": [] //Nope
-      },
-      "LANG": settings.deezerLanguage??'en',
-      "OPTIONS": []
+        'VERSION': '2.5',
+        'SUPPORT': {
+            'ads': [ /* 'native' */ ], //None
+            'deeplink-list': [ 'deeplink' ],
+            'event-card': [ 'live-event' ],
+            'grid-preview-one': grid,
+            'grid-preview-two': grid,
+            'grid': grid,
+            'horizontal-grid': grid,
+            'horizontal-list': [ 'track', 'song' ],
+            'item-highlight': [ 'radio' ],
+            'large-card': ['album', 'external-link', 'playlist', 'show', 'video-link'],
+            'list': [ 'episode' ],
+            'message': [ 'call_onboarding' ],
+            'mini-banner': [ 'external-link' ],
+            'slideshow':        [ 'album', 'artist', 'channel', 'external-link', 'flow', 'livestream', 'playlist', 'show', 'smarttracklist', 'user', 'video-link' ],
+            'small-horizontal-grid': [ 'flow' ],
+            'long-card-horizontal-grid': grid,
+            'filterable-grid': [ 'flow' ]
+        },
+        'LANG': settings.deezerLanguage??'en',
+        'OPTIONS': [ 'deeplink_newsandentertainment', 'deeplink_subscribeoffer' ]
     }));
     
-  // Convert the response to a JSON string for logging
-  String jsonString = jsonEncode(data);
+  // // Convert the response to a JSON string for logging
+  // String jsonString = jsonEncode(data);
 
-  // Use debugPrint for long strings
-  debugPrintLongString(jsonString);
-      debugPrint('API response: $data');
+  // // Use debugPrint for long strings
+  // debugPrintLongString(jsonString);
+  //     debugPrint('API response: $data');
     return HomePage.fromPrivateJson(data['results']);
   }
 
