@@ -294,7 +294,32 @@ class PlayerHelper {
   }
 
   //Load smart track list as queue, start from beginning
+  Future playFromSmartTrackList2(FlowHandler stl) async {
+    //Load from API if no tracks
+    if (stl.tracks == null || stl.tracks.length == 0) {
+      if (settings.offlineMode) {
+        Fluttertoast.showToast(
+          msg: "Offline mode, can't play flow.".i18n,
+          gravity: ToastGravity.BOTTOM,
+          toastLength: Toast.LENGTH_SHORT
+        );
+        return;
+      }
+
+      stl.tracks = await deezerAPI.flow();
+
+    }
+    QueueSource queueSource = QueueSource(
+      id: stl.id,
+      source: stl.id,
+      text: stl.title??('Flow'.i18n)
+    );
+    await playFromTrackList(stl.tracks, stl.tracks[0].id, queueSource);
+  }
+
+  //Load smart track list as queue, start from beginning
   Future playFromSmartTrackList(SmartTrackList stl) async {
+    String qwe;
     //Load from API if no tracks
     if (stl.tracks == null || stl.tracks.length == 0) {
       if (settings.offlineMode) {
@@ -307,7 +332,8 @@ class PlayerHelper {
       }
 
       //Flow songs cannot be accessed by smart track list call
-      if (stl.id == 'flow') {
+      if (stl.id == 'flow' || stl.title == stl.description) {
+        qwe = 'flow';
         stl.tracks = await deezerAPI.flow();
       } else {
         stl = await deezerAPI.smartTrackList(stl.id);
@@ -315,8 +341,8 @@ class PlayerHelper {
     }
     QueueSource queueSource = QueueSource(
       id: stl.id,
-      source: (stl.id == 'flow')?'flow':'smarttracklist',
-      text: stl.title??((stl.id == 'flow') ? 'Flow'.i18n : 'Smart track list'.i18n)
+      source: (qwe == 'flow')?'flow':'smarttracklist',
+      text: stl.title??((qwe == 'flow') ? 'Flow'.i18n : 'Smart track list'.i18n)
     );
     await playFromTrackList(stl.tracks, stl.tracks[0].id, queueSource);
   }

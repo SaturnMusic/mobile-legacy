@@ -53,7 +53,7 @@ public class DownloadService extends Service {
     static final int SERVICE_RETRY_DOWNLOADS = 8;
     static final int SERVICE_REMOVE_DOWNLOADS = 9;
 
-    static final String NOTIFICATION_CHANNEL_ID = "freezerdownloads";
+    static final String NOTIFICATION_CHANNEL_ID = "saturndownloads";
     static final int NOTIFICATION_ID_START = 6969;
 
     boolean running = false;

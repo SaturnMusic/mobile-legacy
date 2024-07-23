@@ -457,6 +457,9 @@ class _QualityInfoWidgetState extends State<QualityInfoWidget> {
   @override
   Widget build(BuildContext context) {
     return TextButton(
+        style: ButtonStyle(
+          overlayColor: MaterialStateProperty.all<Color>(Theme.of(context).primaryColor),
+         ),
       child: Text(value),
       onPressed: () {
         Navigator.of(context).push(MaterialPageRoute(builder: (context) => QualitySettings()));

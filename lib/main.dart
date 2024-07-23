@@ -85,6 +85,7 @@ class _freezerAppState extends State<freezerApp> {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
+      debugShowCheckedModeBanner: false,
       title: 'Saturn',
       //shortcuts: <LogicalKeySet, Intent>{
         //...WidgetsApp.defaultShortcuts,

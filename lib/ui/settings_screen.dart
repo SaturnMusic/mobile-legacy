@@ -1562,14 +1562,14 @@ class _CreditsScreenState extends State<CreditsScreen> {
           freezerDivider(),
           ListTile(
             title: Text('bw86'),
-            subtitle: Text('Logo Designer, Mobile Developer'),
+            subtitle: Text('Logo Designer, Developer'),
           ),
           ListTile(
             title: Text('Matt'),
-            subtitle: Text('Desktop Developer'),
+            subtitle: Text('Developer'),
           ),
           ListTile(
-            title: Text('ettex, Xander, Francesco, Tobs'),
+            title: Text('ettex, Xander Null, Francesco, Tobs'),
             subtitle: Text('Original Freezer App'),
           ),
           Padding(

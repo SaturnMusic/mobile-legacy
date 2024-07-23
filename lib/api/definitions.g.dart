@@ -256,6 +256,19 @@ Map<String, dynamic> _$ImageDetailsToJson(ImageDetails instance) =>
       'thumbUrl': instance.thumbUrl,
     };
 
+FlowImage _$FlowImageFromJson(Map<String, dynamic> json) {
+  return FlowImage(
+    fullUrl: json['fullUrl'] as String,
+    thumbUrl: json['thumbUrl'] as String,
+  );
+}
+
+Map<String, dynamic> _$FlowImageToJson(FlowImage instance) =>
+    <String, dynamic>{
+      'fullUrl': instance.fullUrl,
+      'thumbUrl': instance.thumbUrl,
+    };
+
 Lyrics _$LyricsFromJson(Map<String, dynamic> json) {
   return Lyrics(
     id: json['id'] as String,
@@ -320,6 +333,34 @@ SmartTrackList _$SmartTrackListFromJson(Map<String, dynamic> json) {
     subtitle: json['subtitle'] as String,
   );
 }
+
+FlowHandler _$gayhandler(Map<String, dynamic> json) {
+  return FlowHandler(
+    id: json['id'] as String,
+    title: json['title'] as String,
+    description: json['description'] as String,
+    trackCount: json['trackCount'] as int,
+    tracks: (json['tracks'] as List)
+        ?.map(
+            (e) => e == null ? null : Track.fromJson(e as Map<String, dynamic>))
+        ?.toList(),
+    cover: json['cover'] == null
+        ? null
+        : FlowImage.fromJson(json['cover'] as Map<String, dynamic>),
+    subtitle: json['subtitle'] as String,
+  );
+}
+
+Map<String, dynamic> _$gayerhandler(FlowHandler instance) =>
+    <String, dynamic>{
+      'id': instance.id,
+      'title': instance.title,
+      'subtitle': instance.subtitle,
+      'description': instance.description,
+      'trackCount': instance.trackCount,
+      'tracks': instance.tracks,
+      'cover': instance.cover,
+    };
 
 Map<String, dynamic> _$SmartTrackListToJson(SmartTrackList instance) =>
     <String, dynamic>{

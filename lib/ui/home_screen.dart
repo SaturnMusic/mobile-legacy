@@ -198,7 +198,7 @@ class HomepageRowSection extends StatelessWidget {
       title: Padding(
         padding: EdgeInsets.symmetric(vertical: 4.0, horizontal: 6.0),
         child: Text(
-          section.title??'',
+          (section.title == "Mixes inspired by...")?'':(section.title)??'',
           textAlign: TextAlign.left,
           maxLines: 2,
           overflow: TextOverflow.ellipsis,
@@ -299,6 +299,13 @@ class HomePageItemWidget extends StatelessWidget {
           item.value,
           onTap: () {
             playerHelper.playFromSmartTrackList(item.value);
+          },
+        );
+      case HomePageItemType.FLOW:
+        return FlowTile(
+          item.value,
+          onTap: () {
+            playerHelper.playFromSmartTrackList(SmartTrackList(id: item.value.id));
           },
         );
       case HomePageItemType.ALBUM:

@@ -43,3 +43,6 @@ NOTE: You have to use own keys, or build debug using `flutter build apk --debug`
 # just_audio, audio_service
 This app depends on modified just_audio and audio_service plugins with Deezer support.  
 Both plugins were originally written by ryanheise, all credits to him.    
+
+# Desktop Version
+https://github.com/SaturnMusic/PC    

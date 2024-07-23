@@ -321,6 +321,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "2.0.5"
+  ext_storage:
+    dependency: "direct main"
+    description:
+      name: ext_storage
+      sha256: "999a694721574eb8f0c8b32d1a9139c2e86adb3eaa4bbb89501375bb40b62972"
+      url: "https://pub.dev"
+    source: hosted
+    version: "1.0.3"
   extended_math:
     dependency: "direct main"
     description:
@@ -329,6 +337,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "0.0.29+1"
+  external_app_launcher:
+    dependency: "direct main"
+    description:
+      name: external_app_launcher
+      sha256: "22ba76250c6159955144f1150da159ead76b34ff841ae149c148c186e39fb58a"
+      url: "https://pub.dev"
+    source: hosted
+    version: "2.0.2"
   fading_edge_scrollview:
     dependency: transitive
     description:
