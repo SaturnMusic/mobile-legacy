@@ -690,6 +690,9 @@ class HomePageSection {
     );
 
     String layout = json['layout'];
+
+    if (hps.title == "Mixes inspired by...") { return null; }
+
     switch (layout) {
       case 'ads':
         return null;

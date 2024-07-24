@@ -614,7 +614,6 @@ class BigAlbumArt extends StatefulWidget {
 }
 
 class _BigAlbumArtState extends State<BigAlbumArt> {
-
   PageController _pageController = PageController(
     initialPage: playerHelper.queueIndex,
   );
@@ -633,8 +632,7 @@ class _BigAlbumArtState extends State<BigAlbumArt> {
 
   @override
   void dispose() {
-    if (_currentItemSub != null)
-      _currentItemSub.cancel();
+    if (_currentItemSub != null) _currentItemSub.cancel();
     super.dispose();
   }
 
@@ -646,17 +644,29 @@ class _BigAlbumArtState extends State<BigAlbumArt> {
           Navigator.of(context).pop();
         }
       },
-      child: PageView(
-        controller: _pageController,
-        onPageChanged: (int index) {
-          if (pageViewLock) {
-            pageViewLock = false;
-            return;
-          }
-          if (_animationLock) return;
-          AudioService.skipToQueueItem(AudioService.queue[index].id);
-        },
-        children: List.generate(AudioService.queue.length, (i) => ZoomableImage(url: AudioService.queue[i].artUri)),
+      child: Material( // Added Material widget
+        color: Colors.transparent, // Transparent to maintain existing design
+        child: PageView(
+          controller: _pageController,
+          onPageChanged: (int index) {
+            if (pageViewLock) {
+              pageViewLock = false;
+              return;
+            }
+            if (_animationLock) return;
+            AudioService.skipToQueueItem(AudioService.queue[index].id);
+          },
+          children: List.generate(
+            AudioService.queue.length,
+            (i) => InkWell(
+              onTap: () {
+                // Your onTap functionality here
+              },
+              splashColor: Theme.of(context).primaryColor, // Change this to your desired color
+              child: ZoomableImage(url: AudioService.queue[i].artUri),
+            ),
+          ),
+        ),
       ),
     );
   }

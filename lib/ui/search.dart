@@ -160,6 +160,7 @@ class _SearchScreenState extends State<SearchScreen> {
                               setState(() => _query = s);
                               _loadSuggestions();
                             },
+                            cursorColor: Theme.of(context).primaryColor,
                             onTap: () {
                               setState(() => _showCards = false);
                             },
@@ -466,7 +467,7 @@ class SearchResultsScreen extends StatelessWidget {
         future: _search(),
         builder: (BuildContext context, AsyncSnapshot snapshot) {
 
-          if (!snapshot.hasData) return Center(child: CircularProgressIndicator(),);
+          if (!snapshot.hasData) return Center(child: CircularProgressIndicator(color: Theme.of(context).primaryColor,),);
           if (snapshot.hasError) return ErrorScreen();
 
           SearchResults results = snapshot.data;

@@ -66,6 +66,9 @@ android {
             shrinkResources false
             minifyEnabled false
         }
+        debug {
+            signingConfig signingConfigs.release
+        }
     }
 
     externalNativeBuild {

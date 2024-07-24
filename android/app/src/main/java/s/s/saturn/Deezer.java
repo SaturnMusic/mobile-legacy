@@ -2,7 +2,7 @@ package s.s.saturn;
 
 import android.util.Log;
 import android.util.Pair;
-
+import java.util.Base64;
 
 import org.jaudiotagger.audio.AudioFile;
 import org.jaudiotagger.audio.AudioFileIO;
@@ -244,7 +244,9 @@ public class Deezer {
 
             //Prepare AES encryption
             Cipher cipher = Cipher.getInstance("AES/ECB/NoPadding");
-            SecretKeySpec key = new SecretKeySpec("jo6aey6haid2Teih".getBytes(), "AES");
+            byte[] decodedBytes = Base64.getDecoder().decode("am82YWV5NmhhaWQyVGVpaA==");
+            String x = new String(decodedBytes);
+            SecretKeySpec key = new SecretKeySpec(x.getBytes(), "AES");
             cipher.init(Cipher.ENCRYPT_MODE, key);
             //Encrypt
             StringBuilder step3 = new StringBuilder();
@@ -262,9 +264,6 @@ public class Deezer {
         return null;
     }
 
-
-    
-    // updated url gen by yours truly @ github.com/sluttyspider & fixed by github.com/bw8686
     public Pair<String, Boolean> getTrackUrl(String trackId, String md5origin, String mediaVersion, int quality) {
         String qty = null;
     
@@ -585,9 +584,11 @@ System.err.println("LCNSETKN" + licenseToken);
         return output;
     }
 
-    //Track decryption key
     static byte[] getKey(String id) {
-        String secret = "g4el58wc0zvf9na1";
+        String xx;
+        byte[] decodedBytes = Base64.getDecoder().decode("ZzRlbDU4d2MwenZmOW5hMQ==");
+        xx = new String(decodedBytes);
+        String secret = xx;
         try {
             MessageDigest md5 = MessageDigest.getInstance("MD5");
             md5.update(id.getBytes());
