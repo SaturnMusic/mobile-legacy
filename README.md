@@ -45,4 +45,4 @@ This app depends on modified just_audio and audio_service plugins with Deezer su
 Both plugins were originally written by ryanheise, all credits to him.    
 
 # Desktop Version
-https://github.com/SaturnMusic/PC
+https://github.com/SaturnMusic/PC    

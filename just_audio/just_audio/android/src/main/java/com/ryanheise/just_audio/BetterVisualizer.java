@@ -21,8 +21,12 @@ public class BetterVisualizer {
     }
 
     public int getSamplingRate() {
+        if (visualizer == null) {
+            throw new IllegalStateException("Visualizer is not initialized.");
+        }
         return visualizer.getSamplingRate();
     }
+    
 
     public void setHasPermission(boolean hasPermission) {
         this.hasPermission = hasPermission;
@@ -35,13 +39,17 @@ public class BetterVisualizer {
         }
     }
 
-    public void start(Integer captureRate, Integer captureSize, final boolean enableWavefrom, final boolean enableFft) {
-        if (visualizer != null) return;
+    public void start(Integer captureRate, Integer captureSize, final boolean enableWaveform, final boolean enableFft) {
+        if (visualizer != null) {
+            return;  // Visualizer already initialized
+        }
+    
         if (captureRate == null) {
             captureRate = Visualizer.getMaxCaptureRate() / 2;
         } else if (captureRate > Visualizer.getMaxCaptureRate()) {
             captureRate = Visualizer.getMaxCaptureRate();
         }
+    
         if (captureSize == null) {
             captureSize = Visualizer.getCaptureSizeRange()[1];
         } else if (captureSize > Visualizer.getCaptureSizeRange()[1]) {
@@ -49,26 +57,43 @@ public class BetterVisualizer {
         } else if (captureSize < Visualizer.getCaptureSizeRange()[0]) {
             captureSize = Visualizer.getCaptureSizeRange()[0];
         }
+    
         this.enableWaveform = enableWaveform;
         this.enableFft = enableFft;
         this.captureRate = captureRate;
+        this.captureSize = captureSize;
+    
         if (audioSessionId == null || !hasPermission) {
             pendingStartRequest = true;
             return;
         }
+    
         pendingStartRequest = false;
-        visualizer = new Visualizer(audioSessionId);
-        visualizer.setCaptureSize(captureSize);
-        visualizer.setDataCaptureListener(new Visualizer.OnDataCaptureListener() {
-            public void onWaveFormDataCapture(Visualizer visualizer, byte[] waveform, int samplingRate) {
-                waveformEventChannel.success(waveform);
-            }
-            public void onFftDataCapture(Visualizer visualizer, byte[] fft, int samplingRate) {
-                fftEventChannel.success(fft);
-            }
-        }, captureRate, enableWavefrom, enableFft);
-        visualizer.setEnabled(true);
-    }
+    
+        try {
+            visualizer = new Visualizer(audioSessionId);
+            visualizer.setEnabled(false); // Ensure visualizer is disabled before configuration
+    
+            visualizer.setCaptureSize(captureSize);
+            visualizer.setDataCaptureListener(new Visualizer.OnDataCaptureListener() {
+                @Override
+                public void onWaveFormDataCapture(Visualizer visualizer, byte[] waveform, int samplingRate) {
+                    waveformEventChannel.success(waveform);
+                }
+    
+                @Override
+                public void onFftDataCapture(Visualizer visualizer, byte[] fft, int samplingRate) {
+                    fftEventChannel.success(fft);
+                }
+            }, captureRate, enableWaveform, enableFft);
+    
+            visualizer.setEnabled(true);
+        } catch (IllegalStateException e) {
+            e.printStackTrace();
+            dispose();
+        }
+    }    
+    
 
     public void stop() {
         if (visualizer == null) return;
@@ -82,5 +107,5 @@ public class BetterVisualizer {
         stop();
         waveformEventChannel.endOfStream();
         fftEventChannel.endOfStream();
-    }
+    }    
 }

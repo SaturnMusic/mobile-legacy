@@ -316,16 +316,23 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Aud
 
     private void completeStartVisualizer(boolean success) {
         if (startVisualizerResult == null) return;
+    
         if (success) {
-            visualizer.start(visualizerCaptureRate, visualizerCaptureSize, enableWaveform, enableFft);
-            Map<String, Object> resultMap = new HashMap<String, Object>();
-            resultMap.put("samplingRate", visualizer.getSamplingRate());
-            startVisualizerResult.success(resultMap);
+            try {
+                visualizer.start(visualizerCaptureRate, visualizerCaptureSize, enableWaveform, enableFft);
+                Map<String, Object> resultMap = new HashMap<>();
+                resultMap.put("samplingRate", visualizer.getSamplingRate());
+                startVisualizerResult.success(resultMap);
+            } catch (IllegalStateException e) {
+                startVisualizerResult.error("VisualizerInitializationFailed", e.getMessage(), null);
+            }
         } else {
             startVisualizerResult.error("RECORD_AUDIO permission denied", null, null);
         }
+    
         startVisualizerResult = null;
-    }
+    }    
+    
 
     @Override
     public void onMethodCall(final MethodCall call, final Result result) {
@@ -333,7 +340,7 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Aud
 
         try {
             switch (call.method) {
-            case "startVisualizer":
+                case "startVisualizer":
                 Boolean enableWaveform = call.argument("enableWaveform");
                 Boolean enableFft = call.argument("enableFft");
                 Integer captureRate = call.argument("captureRate");
@@ -343,6 +350,7 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Aud
                 visualizerCaptureRate = captureRate;
                 visualizerCaptureSize = captureSize;
                 startVisualizerResult = result;
+                
                 if (ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) {
                     visualizer.setHasPermission(true);
                     completeStartVisualizer(true);

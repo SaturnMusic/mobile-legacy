@@ -16,7 +16,6 @@ import 'package:path_provider/path_provider.dart';
 import 'package:rxdart/rxdart.dart';
 import 'package:uuid/uuid.dart';
 
-@pragma('vm:entry-point')
 
 final _uuid = Uuid();
 
@@ -913,26 +912,37 @@ class AudioPlayer {
         usage: audioAttributes.usage.value));
   }
 
-  /// Start the visualizer by capturing [captureSize] samples of audio at
-  /// [captureRate] millihertz and return the sampling rate of the audio. If
-  /// [enableWaveform] is `true`, the captured samples will be broadcast via
-  /// [visualizerWaveformStream]. If [enableFft] is `true`, the FFT data for
-  /// each capture will be broadcast via [visualizerFftStream]. You should call
-  /// [stopVisualizer] to stop capturing audio data.
-  Future<int> startVisualizer({
-    bool enableWaveform = true,
-    bool enableFft = true,
-    int captureRate,
-    int captureSize,
-  }) async {
-    return (await (await _platform).startVisualizer(_startVisualizerRequest =
-            StartVisualizerRequest(
-                enableWaveform: enableWaveform,
-                enableFft: enableFft,
-                captureRate: captureRate,
-                captureSize: captureSize)))
-        ?.samplingRate;
+/// Start the visualizer by capturing [captureSize] samples of audio at
+/// [captureRate] millihertz and return the sampling rate of the audio. If
+/// [enableWaveform] is `true`, the captured samples will be broadcast via
+/// [visualizerWaveformStream]. If [enableFft] is `true`, the FFT data for
+/// each capture will be broadcast via [visualizerFftStream]. You should call
+/// [stopVisualizer] to stop capturing audio data.
+Future<int> startVisualizer({
+  bool enableWaveform = true,
+  bool enableFft = true,
+  int captureRate,
+  int captureSize,
+}) async {
+  try {
+    final result = await (await _platform).startVisualizer(_startVisualizerRequest =
+        StartVisualizerRequest(
+            enableWaveform: enableWaveform,
+            enableFft: enableFft,
+            captureRate: captureRate,
+            captureSize: captureSize));
+    if (result != null) {
+      return result.samplingRate;
+    } else {
+      throw PlatformException(
+          code: 'VisualizerInitializationFailed',
+          message: 'Failed to start visualizer');
+    }
+  } catch (e) {
+    // Handle or log error properly
+    rethrow;
   }
+}
 
   /// Stop capturing audio data for the visualizer.
   Future<void> stopVisualizer() async {
@@ -949,6 +959,7 @@ class AudioPlayer {
     await _visualizerFftSubscription?.cancel();
     await _visualizerWaveformSubject.close();
     await _visualizerFftSubject.close();
+    await stopVisualizer();
     if (_nativePlatform != null) {
       await _disposePlatform(await _nativePlatform);
       _nativePlatform = null;

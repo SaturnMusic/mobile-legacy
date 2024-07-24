@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 
 import 'just_audio_platform_interface.dart';
 
+
 /// An implementation of [JustAudioPlatform] that uses method channels.
 class MethodChannelJustAudio extends JustAudioPlatform {
   static final _mainChannel = MethodChannel('com.ryanheise.just_audio.methods');

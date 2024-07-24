@@ -264,7 +264,7 @@ class _AppearanceSettingsState extends State<AppearanceSettings> {
           ),
           ListTile(
             title: Text('Visualizer'.i18n),
-            subtitle: Text('Show visualizers on lyrics page. WARNING: Requires microphone permission!'.i18n),
+            subtitle: Text('Show visualizers on lyrics page. WARNING: Requires microphone permission and may be buggy!'.i18n),
             leading: Icon(Icons.equalizer),
             trailing: Switch(
               value: settings.lyricsVisualizer,
@@ -1059,11 +1059,17 @@ class _DownloadsSettingsState extends State<DownloadsSettings> {
             trailing: Container(
               width: 75.0,
               child: TextField(
+                cursorColor: Theme.of(context).primaryColor,
                 controller: _artistSeparatorController,
                 onChanged: (s) async {
                   settings.artistSeparator = s;
                   await settings.save();
                 },
+                decoration: InputDecoration(
+                  focusedBorder: UnderlineInputBorder(
+                    borderSide: BorderSide(color: Theme.of(context).primaryColor), // Color of the underline when focused
+                  ),
+                ),
               ),
             ),
           ),
@@ -1246,10 +1252,16 @@ class _GeneralSettingsState extends State<GeneralSettings> {
             trailing: Container(
               width: 75.0,
               child: TextField(
+                cursorColor: Theme.of(context).primaryColor,
                 onChanged: (s) async {
                   settings.lastFMAPIKey = s;
                   await settings.save();
                 },
+                  decoration: InputDecoration(
+                  focusedBorder: UnderlineInputBorder(
+                    borderSide: BorderSide(color: Theme.of(context).primaryColor), // Color of the underline when focused
+                  ),
+                ),
               ),
             ),
           ),
@@ -1259,10 +1271,16 @@ class _GeneralSettingsState extends State<GeneralSettings> {
             trailing: Container(
               width: 75.0,
               child: TextField(
+                cursorColor: Theme.of(context).primaryColor,
                 onChanged: (s) async {
                   settings.lastFMAPISecret = s;
                   await settings.save();
                 },
+                  decoration: InputDecoration(
+                  focusedBorder: UnderlineInputBorder(
+                    borderSide: BorderSide(color: Theme.of(context).primaryColor), // Color of the underline when focused
+                  ),
+                ),
               ),
             ),
           ),
@@ -1527,14 +1545,14 @@ class _CreditsScreenState extends State<CreditsScreen> {
               launch('https://t.me/SaturnReleases');
             },
           ),
-          // ListTile(
-          //   title: Text('Telegram Group'.i18n),
-          //   subtitle: Text('Official chat'.i18n),
-          //   leading: Icon(FontAwesome5.telegram, color: Colors.cyan, size: 36.0),
-          //   onTap: () {
-          //     launch('https://t.me/freezerandroid');
-          //   },
-          // ),
+          ListTile(
+            title: Text('Telegram Group'.i18n),
+            subtitle: Text('Official chat'.i18n),
+            leading: Icon(FontAwesome5.telegram, color: Colors.cyan, size: 36.0),
+            onTap: () {
+              launch('https://t.me/SaturnDiscuss');
+            },
+          ),
           ListTile(
             title: Text('Discord'.i18n),
             subtitle: Text('Official Discord server'.i18n),
@@ -1551,14 +1569,14 @@ class _CreditsScreenState extends State<CreditsScreen> {
               launch('https://github.com/SaturnMusic/Mobile');
             },
           ),
-          // ListTile(
-          //   title: Text('Donate'),
-          //   subtitle: Text('You should rather support your favorite artists, instead of this app!'),
-          //   leading: Icon(FontAwesome5.paypal, color: Colors.blue, size: 36.0),
-          //   onTap: () {
-          //     launch('https://paypal.me/exttex');
-          //   },
-          // ),
+          ListTile(
+            title: Text('Donate'),
+            subtitle: Text('Send crypto to the Saturn fund to support the development.'),
+            leading: Icon(FontAwesome5.bitcoin, color: Color.fromRGBO(247,147,26, 58), size: 36.0),
+            onTap: () {
+              launch('https://fund.saturnclient.dev/');
+            },
+          ),
           freezerDivider(),
           ListTile(
             title: Text('bw86'),

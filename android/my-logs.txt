@@ -10214,7 +10214,7 @@ ADDED from [androidx.lifecycle:lifecycle-process:2.4.1] C:\Users\dingd\.gradle\c
 54-->C:\Users\dingd\Documents\freezer-master\android\app\src\main\AndroidManifest.xml:26:13-35
 55            android:exported="true"
 55-->C:\Users\dingd\Documents\freezer-master\android\app\src\main\AndroidManifest.xml:27:13-36
-56            android:process=":FreezerDownloadService"
+56            android:process=":saturndownloadservice"
 56-->C:\Users\dingd\Documents\freezer-master\android\app\src\main\AndroidManifest.xml:29:13-54
 57            android:stopWithTask="false" />
 57-->C:\Users\dingd\Documents\freezer-master\android\app\src\main\AndroidManifest.xml:28:13-41

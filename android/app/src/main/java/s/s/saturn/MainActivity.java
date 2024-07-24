@@ -4,6 +4,7 @@ import android.content.ComponentName;
 import android.content.ContentValues;
 import android.content.Context;
 import android.content.Intent;
+import android.content.pm.PackageManager;
 import android.content.ServiceConnection;
 import android.database.Cursor;
 import android.database.sqlite.SQLiteDatabase;
@@ -14,6 +15,9 @@ import android.os.Message;
 import android.os.Messenger;
 import android.os.RemoteException;
 import android.util.Log;
+import android.os.Build;
+import android.provider.Settings;
+import android.net.Uri;
 
 import androidx.annotation.NonNull;
 
@@ -37,6 +41,7 @@ import io.flutter.plugins.GeneratedPluginRegistrant;
 public class MainActivity extends FlutterActivity {
     private static final String CHANNEL = "s.s.saturn/native";
     private static final String EVENT_CHANNEL = "s.s.saturn/downloads";
+    
     EventChannel.EventSink eventSink;
 
     boolean serviceBound = false;
@@ -45,7 +50,7 @@ public class MainActivity extends FlutterActivity {
     SQLiteDatabase db;
     StreamServer streamServer;
 
-    //Data if started from intent
+    // Data if started from intent
     String intentPreload;
 
     @Override
@@ -209,6 +214,19 @@ public class MainActivity extends FlutterActivity {
                     streamServer.stop();
                 System.exit(0);
             }
+            
+            // Check if can request package installs
+            if (call.method.equals("checkInstallPackagesPermission")) {
+                result.success(canRequestPackageInstalls());
+                return;
+            }
+
+            // Request install packages permission
+            if (call.method.equals("requestInstallPackagesPermission")) {
+                requestInstallPackagesPermission();
+                result.success(true);
+                return;
+            }
 
             result.error("0", "Not implemented!", "Not implemented!");
         });
@@ -226,6 +244,22 @@ public class MainActivity extends FlutterActivity {
                 eventSink = null;
             }
         });
+    }
+
+    private boolean canRequestPackageInstalls() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            return getPackageManager().canRequestPackageInstalls();
+        } else {
+            return true;
+        }
+    }
+
+    private void requestInstallPackagesPermission() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            Intent intent = new Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES)
+                .setData(Uri.parse(String.format("package:%s", getPackageName())));
+            startActivity(intent);
+        }
     }
 
     // Start/Bind/Reconnect to download service

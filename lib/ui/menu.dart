@@ -782,7 +782,7 @@ class _SelectPlaylistDialogState extends State<SelectPlaylistDialog> {
           );
           if (snapshot.connectionState != ConnectionState.done) return SizedBox(
             height: 100,
-            child: Center(child: CircularProgressIndicator(),),
+            child: Center(child: CircularProgressIndicator(color: Theme.of(context).primaryColor,),),
           );
 
           List<Playlist> playlists = snapshot.data;

@@ -9,6 +9,8 @@ import 'package:http/http.dart' as http;
 import 'package:flutter/foundation.dart'; //logging
 import 'package:flutter/services.dart';
 
+import 'package:Saturn/api/cache.dart';
+
 import 'dart:convert';
 import 'dart:async';
 
@@ -122,7 +124,17 @@ class DeezerAPI {
         this.token = data['results']['checkForm'];
         this.userId = data['results']['USER']['USER_ID'].toString();
         this.userName = data['results']['USER']['BLOG_NAME'];
-        this.favoritesPlaylistId = data['results']['USER']['LOVEDTRACKS_ID'];
+        this.favoritesPlaylistId = data['results']['USER']['LOVEDTRACKS_ID']; // useful for later
+        Future<List<Track>> futureTracks = playlistTracksPage(this.favoritesPlaylistId, 0);
+        List<Track> tracks = await futureTracks;
+        for (Track track in tracks) {
+            debugPrint("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! HERE !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
+            debugPrint(track.id);
+            debugPrint("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! HERE !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
+            cache.libraryTracks.add(track.id); // add track id to cached favorites
+        }
+        debugPrint("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! CACHE HERE !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
+        debugPrint(cache.libraryTracks.toString());
         return true;
       }
     } catch (e) {

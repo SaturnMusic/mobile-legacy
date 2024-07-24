@@ -14,10 +14,10 @@ import 'package:package_info/package_info.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as p;
 import 'dart:convert';
+import 'package:permission_handler/permission_handler.dart';
 
 import 'package:version/version.dart';
-
-
+import 'package:flutter/services.dart';
 
 class UpdaterScreen extends StatefulWidget {
   @override
@@ -26,6 +26,8 @@ class UpdaterScreen extends StatefulWidget {
 
 class _UpdaterScreenState extends State<UpdaterScreen> {
 
+  static const platform = const MethodChannel('s.s.saturn/native');
+
   bool _loading = true;
   bool _error = false;
   freezerVersions _versions;
@@ -33,6 +35,25 @@ class _UpdaterScreenState extends State<UpdaterScreen> {
   String _arch;
   double _progress = 0.0;
   bool _buttonEnabled = true;
+
+  Future<void> _checkInstallPackagesPermission() async {
+    try {
+      final bool result = await platform.invokeMethod('checkInstallPackagesPermission');
+      if (!result) {
+        _requestInstallPackagesPermission();
+      }
+    } on PlatformException catch (e) {
+      print("Failed to check install packages permission: '${e.message}'.");
+    }
+  }
+
+  Future<void> _requestInstallPackagesPermission() async {
+    try {
+      await platform.invokeMethod('requestInstallPackagesPermission');
+    } on PlatformException catch (e) {
+      print("Failed to request install packages permission: '${e.message}'.");
+    }
+  }
 
   Future _load() async {
     //Load current version
@@ -63,6 +84,7 @@ class _UpdaterScreenState extends State<UpdaterScreen> {
   }
 
   Future _download() async {
+    await _checkInstallPackagesPermission(); // Check and request permission if needed
     String url = _versionDownload.directUrl;
     //Start request
     http.Client client = new http.Client();
@@ -81,11 +103,11 @@ class _UpdaterScreenState extends State<UpdaterScreen> {
     //Pipe
     await res.stream.pipe(fileSink);
     fileSink.close();
-
+    debugPrint(path); 
     OpenFile.open(path);
+
     setState(() => _buttonEnabled = true);
   }
-
 
   @override
   void initState() {
@@ -108,7 +130,7 @@ class _UpdaterScreenState extends State<UpdaterScreen> {
               padding: EdgeInsets.all(8.0),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.center,
-                children: [CircularProgressIndicator()],
+                children: [CircularProgressIndicator(color: Theme.of(context).primaryColor,)],
               ),
             ),
 
@@ -170,6 +192,9 @@ class _UpdaterScreenState extends State<UpdaterScreen> {
                 if (_versionDownload != null)
                   Column(children: [
                     ElevatedButton(
+                      style: ButtonStyle(
+                        backgroundColor: MaterialStatePropertyAll<Color>(Theme.of(context).primaryColor),
+                      ),
                       child: Text('Download'.i18n + ' (${_versionDownload.version})'),
                       onPressed: _buttonEnabled ? () {
                         setState(() => _buttonEnabled = false);
@@ -178,7 +203,7 @@ class _UpdaterScreenState extends State<UpdaterScreen> {
                     ),
                     Padding(
                       padding: EdgeInsets.all(8.0),
-                      child: LinearProgressIndicator(value: _progress),
+                      child: LinearProgressIndicator(value: _progress, color: Theme.of(context).primaryColor,),
                     )
                   ]),
                 //Unsupported arch
@@ -190,7 +215,6 @@ class _UpdaterScreenState extends State<UpdaterScreen> {
                   )
               ],
             )
-
         ],
       )
     );

@@ -194,9 +194,9 @@ class HomepageRowSection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ListTile(
-      contentPadding: EdgeInsets.symmetric(horizontal: 4.0, vertical: 2.0),
+      contentPadding: (section.title == "Mixes inspired by...")?EdgeInsets.symmetric(vertical: 0.0, horizontal: 0.0):EdgeInsets.symmetric(horizontal: 4.0, vertical: 2.0),
       title: Padding(
-        padding: EdgeInsets.symmetric(vertical: 4.0, horizontal: 6.0),
+        padding: (section.title == "Mixes inspired by...")?EdgeInsets.symmetric(vertical: 0.0, horizontal: 0.0):EdgeInsets.symmetric(vertical: 4.0, horizontal: 6.0),
         child: Text(
           (section.title == "Mixes inspired by...")?'':(section.title)??'',
           textAlign: TextAlign.left,
@@ -256,9 +256,9 @@ class HomePageGridSection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ListTile(
-      contentPadding: EdgeInsets.symmetric(horizontal: 4.0, vertical: 2.0),
+      contentPadding: (section.title == "Mixes inspired by...")?EdgeInsets.symmetric(vertical: 0.0, horizontal: 0.0):EdgeInsets.symmetric(horizontal: 4.0, vertical: 2.0),
       title: Padding(
-        padding: EdgeInsets.symmetric(vertical: 4.0, horizontal: 6.0),
+        padding: (section.title == "Mixes inspired by...")?EdgeInsets.symmetric(vertical: 0.0, horizontal: 0.0):EdgeInsets.symmetric(vertical: 4.0, horizontal: 6.0),
         child: Text(
           section.title??'',
           textAlign: TextAlign.left,

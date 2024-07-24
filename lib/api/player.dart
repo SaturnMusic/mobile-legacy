@@ -12,7 +12,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:Saturn/translations.i18n.dart';
 import 'package:scrobblenaut/scrobblenaut.dart';
 import 'package:extended_math/extended_math.dart';
-
+import 'package:flutter/foundation.dart';
 import 'definitions.dart';
 import '../settings.dart';
 
@@ -791,34 +791,44 @@ class AudioPlayerTask extends BackgroundAudioTask {
       case 'setIndex':
         this._queueIndex = args;
         break;
-      //Start visualizer
-      case 'startVisualizer':
-        if (_visualizerSubscription != null) break;
+// Start visualizer
+case 'startVisualizer':
+  if (_visualizerSubscription != null) break;
 
-        _player.startVisualizer(
-          enableWaveform: false,
-          enableFft: true,
-          captureRate: 15000,
-          captureSize: 128
-        );
-        _visualizerSubscription = _player.visualizerFftStream.listen((event) {
-          //Calculate actual values
-          List<double> out = [];
-          for (int i=0; i<event.length/2; i++) {
-            int rfk = event[i*2].toSigned(8);
-            int ifk = event[i*2+1].toSigned(8);
-            out.add(log(hypot(rfk, ifk) + 1) / 5.2);
-          }
-          AudioServiceBackground.sendCustomEvent({"action": "visualizer", "data": out});
-        });
-        break;
-      //Stop visualizer
-      case 'stopVisualizer':
-        if (_visualizerSubscription != null) {
-          _visualizerSubscription.cancel();
-          _visualizerSubscription = null;
-        }
-        break;
+  try {
+    _player.startVisualizer(
+      enableWaveform: false,
+      enableFft: true,
+      captureRate: 15000,
+      captureSize: 128,
+    );
+
+    _visualizerSubscription = _player.visualizerFftStream.listen((event) {
+      // Calculate actual values
+      List<double> out = [];
+      for (int i = 0; i < event.length / 2; i++) {
+        int rfk = event[i * 2].toSigned(8);
+        int ifk = event[i * 2 + 1].toSigned(8);
+        out.add(log(hypot(rfk, ifk) + 1) / 5.2);
+      }
+      AudioServiceBackground.sendCustomEvent({
+        "action": "visualizer",
+        "data": out,
+      });
+    });
+  } catch (e) {
+    // Handle errors if any during the visualizer setup
+    print("Error starting visualizer: $e");
+  }
+  break;
+
+// Stop visualizer
+case 'stopVisualizer':
+  if (_visualizerSubscription != null) {
+    await _visualizerSubscription.cancel();  // Ensure cancellation is awaited
+    _visualizerSubscription = null;
+  }
+  break;
       //Authorize lastfm
       case 'authorizeLastFM':
         String username = args[0];

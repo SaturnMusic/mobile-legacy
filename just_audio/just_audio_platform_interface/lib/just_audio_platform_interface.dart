@@ -7,7 +7,6 @@ import 'package:plugin_platform_interface/plugin_platform_interface.dart';
 
 import 'method_channel_just_audio.dart';
 
-@pragma('vm:entry-point')
 
 /// The interface that implementations of just_audio must implement.
 ///
