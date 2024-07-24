@@ -69,7 +69,7 @@ class _AlbumDetailsState extends State<AlbumDetails> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-        body: _error ? ErrorScreen() : _loading ? Center(child: CircularProgressIndicator()) :
+        body: _error ? ErrorScreen() : _loading ? Center(child: CircularProgressIndicator(color: Theme.of(context).primaryColor,)) :
         ListView(
           children: <Widget>[
             //Album art, title, artists
@@ -324,7 +324,7 @@ class ArtistDetails extends StatelessWidget {
         builder: (BuildContext context, AsyncSnapshot snapshot) {
           //Error / not done
           if (snapshot.hasError) return ErrorScreen();
-          if (snapshot.connectionState != ConnectionState.done) return Center(child: CircularProgressIndicator(),);
+          if (snapshot.connectionState != ConnectionState.done) return Center(child: CircularProgressIndicator(color: Theme.of(context).primaryColor,),);
 
           return ListView(
             children: <Widget>[
