@@ -134,11 +134,11 @@ class MenuSheet {
   }
 
   //Default track options
-  void defaultTrackMenu(Track track, {List<Widget> options = const [], Function onRemove}) {
+  void defaultTrackMenu(Track track, {List<Widget> options = const [], Function onRemove}) async {
     showWithTrack(track, [
       addToQueueNext(track),
       addToQueue(track),
-      (cache.checkTrackFavorite(track))?removeFavoriteTrack(track, onUpdate: onRemove):addTrackFavorite(track),
+      (await cache.checkTrackFavorite(track))?removeFavoriteTrack(track, onUpdate: onRemove):addTrackFavorite(track),
       addToPlaylist(track),
       downloadTrack(track),
       offlineTrack(track),

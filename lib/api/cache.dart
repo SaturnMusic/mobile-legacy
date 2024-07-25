@@ -1,4 +1,5 @@
 import 'package:Saturn/api/definitions.dart';
+import 'package:Saturn/api/deezer.dart';
 import 'package:json_annotation/json_annotation.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as p;
@@ -54,11 +55,19 @@ class Cache {
   Cache({this.libraryTracks});
 
   //Wrapper to test if track is favorite against cache
-  bool checkTrackFavorite(Track t) {
+  Future<bool> checkTrackFavorite(Track t) async {
+      //LOAD FAVORITE TRACKS INTO CACHE
+    Future<List<Track>> futureTracks = deezerAPI.playlistTracksPage(deezerAPI.favoritesPlaylistId, 0);
+    List<Track> tracks = await futureTracks;
+    for (Track track in tracks) {
+      cache.libraryTracks.add(track.id); // add track id to cached favorites
+    }
     if (t.favorite != null && t.favorite) return true;
     if (libraryTracks == null || libraryTracks.length == 0) return false;
     return libraryTracks.contains(t.id);
   }
+
+
 
   //Add to history
   void addToSearchHistory(dynamic item) async {

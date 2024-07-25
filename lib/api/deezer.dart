@@ -377,13 +377,6 @@ class DeezerAPI {
     SystemNavigator.pop();
   }
 
-  //LOAD FAVORITE TRACKS INTO CACHE
-  Future<List<Track>> futureTracks = playlistTracksPage(this.favoritesPlaylistId, 0);
-  List<Track> tracks = await futureTracks;
-  for (Track track in tracks) {
-    cache.libraryTracks.add(track.id); // add track id to cached favorites
-  }
-
     Map data = await callApi('page.get', gatewayInput: jsonEncode({
       "PAGE": "home",
       'VERSION': '2.5',

@@ -556,7 +556,7 @@ class PlaybackControls extends StatefulWidget {
 class _PlaybackControlsState extends State<PlaybackControls> {
 
   Icon get libraryIcon {
-    if (cache.checkTrackFavorite(Track.fromMediaItem(AudioService.currentMediaItem))) {
+    if (cache.checkTrackFavorite(Track.fromMediaItem(AudioService.currentMediaItem)) != null) {
       return Icon(Icons.favorite, size: widget.iconSize * 0.64, semanticLabel: "Unlove".i18n,);
     }
     return Icon(Icons.favorite_border, size: widget.iconSize * 0.64, semanticLabel: "Love".i18n,);
@@ -588,7 +588,7 @@ class _PlaybackControlsState extends State<PlaybackControls> {
               if (cache.libraryTracks == null)
                 cache.libraryTracks = [];
 
-              if (cache.checkTrackFavorite(Track.fromMediaItem(AudioService.currentMediaItem))) {
+              if (cache.checkTrackFavorite(Track.fromMediaItem(AudioService.currentMediaItem)) != null) {
                 //Remove from library
                 setState(() => cache.libraryTracks.remove(AudioService.currentMediaItem.id));
                 await deezerAPI.removeFavorite(AudioService.currentMediaItem.id);
