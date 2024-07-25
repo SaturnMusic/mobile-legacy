@@ -85,6 +85,11 @@ dependencies {
     implementation group: 'org.nanohttpd', name: 'nanohttpd', version: '2.3.1'
 }
 
+task DocsByDokka (type: org.jetbrains.dokka.gradle.DokkaTask) {
+    outputFormat = "html"
+    outputDirectory = "$buildDir/dokka"
+}
+
 flutter {
     source '../..'
 }

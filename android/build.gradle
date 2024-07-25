@@ -1,13 +1,15 @@
 buildscript {
-        ext.kotlin_version = '1.6.10' // Change here
+        ext.kotlin_version = '1.7.10' // Change here
     repositories {
         google()
         jcenter()
+        mavenCentral()
     }
 
     dependencies {
-        classpath 'com.android.tools.build:gradle:7.1.3'
+        classpath 'com.android.tools.build:gradle:7.2.0'
         classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlin_version"
+        classpath "org.jetbrains.dokka:dokka-gradle-plugin:0.10.0"
     }
 }
 
@@ -15,6 +17,7 @@ allprojects {
     repositories {
         google()
         jcenter()
+        mavenCentral()
     }
 }
 

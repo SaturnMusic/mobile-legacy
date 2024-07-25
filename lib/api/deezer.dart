@@ -124,17 +124,7 @@ class DeezerAPI {
         this.token = data['results']['checkForm'];
         this.userId = data['results']['USER']['USER_ID'].toString();
         this.userName = data['results']['USER']['BLOG_NAME'];
-        this.favoritesPlaylistId = data['results']['USER']['LOVEDTRACKS_ID']; // useful for later
-        Future<List<Track>> futureTracks = playlistTracksPage(this.favoritesPlaylistId, 0);
-        List<Track> tracks = await futureTracks;
-        for (Track track in tracks) {
-            debugPrint("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! HERE !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
-            debugPrint(track.id);
-            debugPrint("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! HERE !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
-            cache.libraryTracks.add(track.id); // add track id to cached favorites
-        }
-        debugPrint("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! CACHE HERE !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
-        debugPrint(cache.libraryTracks.toString());
+        this.favoritesPlaylistId = data['results']['USER']['LOVEDTRACKS_ID'];
         return true;
       }
     } catch (e) {
@@ -373,6 +363,8 @@ class DeezerAPI {
   //Get homepage/music library from deezer
   Future<HomePage> homePage() async {
     List grid = ['album', 'artist', 'channel', 'flow', 'playlist', 'radio', 'show', 'smarttracklist', 'track', 'user'];
+  
+  // CHECK FOR FREE USERS
   // Call API to get user data
   Map usrdata = await callApi('deezer.getUserData', params: {});
   // Extract OFFER_NAME from user data
@@ -383,6 +375,13 @@ class DeezerAPI {
     await logOut();
     await DownloadManager.platform.invokeMethod("kill");
     SystemNavigator.pop();
+  }
+
+  //LOAD FAVORITE TRACKS INTO CACHE
+  Future<List<Track>> futureTracks = playlistTracksPage(this.favoritesPlaylistId, 0);
+  List<Track> tracks = await futureTracks;
+  for (Track track in tracks) {
+    cache.libraryTracks.add(track.id); // add track id to cached favorites
   }
 
     Map data = await callApi('page.get', gatewayInput: jsonEncode({

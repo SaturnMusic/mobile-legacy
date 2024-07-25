@@ -209,8 +209,13 @@ FocusNode focusNode = FocusNode(
                             title: Text('Enter ARL'.i18n),
                             content: Container(
                               child: TextField(
+                                cursorColor: Theme.of(context).primaryColor,
                                 onChanged: (String s) => _arl = s,
                                 decoration: InputDecoration(
+                                  focusedBorder: UnderlineInputBorder(
+                                    borderSide: BorderSide(color: Theme.of(context).primaryColor), // Color of the underline when focused
+                                  ),
+                                  floatingLabelStyle: TextStyle(color: Theme.of(context).primaryColor), // Label color when focused
                                   labelText: 'Token (ARL)'.i18n
                                 ),
                                 focusNode: focusNode,
@@ -233,13 +238,6 @@ FocusNode focusNode = FocusNode(
                 ),
               ),
               Container(height: 16.0,),
-              Text(
-                "If you don't have account, you can register on deezer.com for free.".i18n,
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 16.0
-                ),
-              ),
 
               Container(height: 8.0,),
               Divider(),

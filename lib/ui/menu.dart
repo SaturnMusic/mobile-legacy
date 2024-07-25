@@ -865,6 +865,10 @@ class _CreatePlaylistDialogState extends State<CreatePlaylistDialog> {
         children: <Widget>[
           TextField(
             decoration: InputDecoration(
+              focusedBorder: UnderlineInputBorder(
+                borderSide: BorderSide(color: Theme.of(context).primaryColor), // Color of the underline when focused
+              ),
+              floatingLabelStyle: TextStyle(color: Theme.of(context).primaryColor), // Label color when focused
               labelText: 'Title'.i18n
             ),
             controller: _titleController ?? TextEditingController(),
@@ -874,7 +878,11 @@ class _CreatePlaylistDialogState extends State<CreatePlaylistDialog> {
             onChanged: (String s) => _description = s,
             controller: _descController ?? TextEditingController(),
             decoration: InputDecoration(
-                labelText: 'Description'.i18n
+              focusedBorder: UnderlineInputBorder(
+                borderSide: BorderSide(color: Theme.of(context).primaryColor), // Color of the underline when focused
+              ),
+              floatingLabelStyle: TextStyle(color: Theme.of(context).primaryColor), // Label color when focused
+              labelText: 'Description'.i18n
             ),
           ),
           Container(height: 4.0,),
