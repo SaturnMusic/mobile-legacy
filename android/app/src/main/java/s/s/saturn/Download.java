@@ -1,4 +1,4 @@
-package s.s.saturn;
+                         package s.s.saturn;
 
 import android.content.ContentValues;
 import android.database.Cursor;
@@ -11,6 +11,8 @@ public class Download {
     boolean priv;
     int quality;
     String trackId;
+    String streamTrackId;
+    String trackToken;
     String md5origin;
     String mediaVersion;
     DownloadState state;
@@ -21,7 +23,7 @@ public class Download {
     long received;
     long filesize;
 
-    Download(int id, String path, boolean priv, int quality, DownloadState state, String trackId, String md5origin, String mediaVersion, String title, String image) {
+    Download(int id, String path, boolean priv, int quality, DownloadState state, String trackId, String md5origin, String mediaVersion, String title, String image, String trackToken, String streamTrackId) {
         this.id = id;
         this.path = path;
         this.priv = priv;
@@ -32,6 +34,8 @@ public class Download {
         this.title = title;
         this.image = image;
         this.quality = quality;
+        this.trackToken = trackToken;
+        this.streamTrackId = streamTrackId;
     }
 
     enum DownloadState {
@@ -56,10 +60,20 @@ public class Download {
         return trackId.startsWith("-");
     }
 
-    //Get download from SQLite cursor, HAS TO ALIGN
+    //Get download from SQLite cursor, HAS TO ALIGN (see DownloadsDatabase onCreate)
     static Download fromSQL(Cursor cursor) {
-        return new Download(cursor.getInt(0), cursor.getString(1), cursor.getInt(2) == 1, cursor.getInt(3), DownloadState.values()[cursor.getInt(4)],
-            cursor.getString(5), cursor.getString(6), cursor.getString(7), cursor.getString(8), cursor.getString(9)
+        return new Download(cursor.getInt(0),
+                cursor.getString(1),
+                cursor.getInt(2) == 1,
+                cursor.getInt(3),
+                DownloadState.values()[cursor.getInt(4)],
+                cursor.getString(5),
+                cursor.getString(6),
+                cursor.getString(7),
+                cursor.getString(8),
+                cursor.getString(9),
+                cursor.getString(10),
+                cursor.getString(11)
         );
     }
 
@@ -75,6 +89,8 @@ public class Download {
         values.put("title", (String)data.get("title"));
         values.put("image", (String)data.get("image"));
         values.put("quality", (int)data.get("quality"));
+        values.put("trackToken", (String)data.get("trackToken"));
+        values.put("streamTrackId", (String)data.get("streamTrackId"));
 
         return values;
     }

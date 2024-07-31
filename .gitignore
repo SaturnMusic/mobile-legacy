@@ -1,13 +1,21 @@
 #Key stuff
-freezerkey.jsk
+key.properties
+**/*.keystore
+**/*.jks
 android/key.properties
 
-audio_service/.idea
-audio_service/.dart_tool
-
 android/local.properties
-just_audio/.idea
-just_audio/.dart_tool
+
+scrobblenaut/.idea
+scrobblenaut/.dart_tool
+
+external_path/*
+equalizer_flutter/*
+marquee/*
+scrobblenaut/*
+move_to_background/*
+custom_navigator/*
+
 .gradle/
 android/.gradle
 android/.idea
@@ -37,7 +45,7 @@ android/local.properties
 # The .vscode folder contains launch configuration and tasks you configure in
 # VS Code which you may wish to be included in version control, so this line
 # is commented out by default.
-#.vscode/
+.vscode/
 
 android/app/.cxx
 
@@ -50,7 +58,8 @@ android/app/.cxx
 .pub-cache/
 .pub/
 /build/
-.gradle/
+coverage/
+pubspec.lock
 
 # Web related
 lib/generated_plugin_registrant.dart
@@ -63,3 +72,7 @@ app.*.map.json
 
 # Exceptions to above rules.
 !/packages/flutter_tools/test/data/dart_dependencies_test/**/.packages
+
+# Envied
+.env
+lib/utils/env.g.dart

@@ -2,25 +2,27 @@ package s.s.saturn;
 
 import android.content.ComponentName;
 import android.content.ContentValues;
-import android.content.Context;
 import android.content.Intent;
-import android.content.pm.PackageManager;
 import android.content.ServiceConnection;
 import android.database.Cursor;
 import android.database.sqlite.SQLiteDatabase;
+import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.IBinder;
+import android.os.Looper;
 import android.os.Message;
 import android.os.Messenger;
+import android.os.Parcelable;
 import android.os.RemoteException;
 import android.util.Log;
-import android.os.Build;
-import android.provider.Settings;
-import android.net.Uri;
 
 import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 
+import com.ryanheise.audioservice.AudioServiceActivity;
+
+import java.lang.ref.WeakReference;
 import java.security.KeyManagementException;
 import java.security.NoSuchAlgorithmException;
 import java.security.cert.X509Certificate;
@@ -32,16 +34,13 @@ import javax.net.ssl.SSLContext;
 import javax.net.ssl.TrustManager;
 import javax.net.ssl.X509TrustManager;
 
-import io.flutter.embedding.android.FlutterActivity;
 import io.flutter.embedding.engine.FlutterEngine;
 import io.flutter.plugin.common.EventChannel;
 import io.flutter.plugin.common.MethodChannel;
-import io.flutter.plugins.GeneratedPluginRegistrant;
 
-public class MainActivity extends FlutterActivity {
+public class MainActivity extends AudioServiceActivity {
     private static final String CHANNEL = "s.s.saturn/native";
     private static final String EVENT_CHANNEL = "s.s.saturn/downloads";
-    
     EventChannel.EventSink eventSink;
 
     boolean serviceBound = false;
@@ -50,68 +49,68 @@ public class MainActivity extends FlutterActivity {
     SQLiteDatabase db;
     StreamServer streamServer;
 
-    // Data if started from intent
+    //Data if started from intent
     String intentPreload;
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
-        super.onCreate(savedInstanceState);
         Intent intent = getIntent();
         intentPreload = intent.getStringExtra("preload");
+        super.onCreate(savedInstanceState);
     }
 
     @Override
     public void configureFlutterEngine(@NonNull FlutterEngine flutterEngine) {
-        super.configureFlutterEngine(flutterEngine);
-        GeneratedPluginRegistrant.registerWith(flutterEngine);
+        //Flutter method channel
+        new MethodChannel(flutterEngine.getDartExecutor().getBinaryMessenger(), CHANNEL).setMethodCallHandler(((call, result) -> {
 
-        // Flutter method channel
-        new MethodChannel(flutterEngine.getDartExecutor().getBinaryMessenger(), CHANNEL).setMethodCallHandler((call, result) -> {
-            // Add downloads to DB, then refresh service
+            //Add downloads to DB, then refresh service
             if (call.method.equals("addDownloads")) {
-                // TX
-                db.beginTransaction();
+                ArrayList<HashMap<?,?>> downloads = call.arguments();
 
-                ArrayList<HashMap> downloads = call.arguments();
-                for (int i = 0; i < downloads.size(); i++) {
-                    // Check if exists
-                    Cursor cursor = db.rawQuery("SELECT id, state, quality FROM Downloads WHERE trackId == ? AND path == ?",
-                            new String[]{(String) downloads.get(i).get("trackId"), (String) downloads.get(i).get("path")});
-                    if (cursor.getCount() > 0) {
-                        // If done or error, set state to NONE - they should be skipped because file exists
-                        cursor.moveToNext();
-                        if (cursor.getInt(1) >= 3) {
-                            ContentValues values = new ContentValues();
-                            values.put("state", 0);
-                            values.put("quality", cursor.getInt(2));
-                            db.update("Downloads", values, "id == ?", new String[]{Integer.toString(cursor.getInt(0))});
-                            Log.d("INFO", "Already exists in DB, updating to none state!");
-                        } else {
-                            Log.d("INFO", "Already exits in DB!");
+                if (downloads != null) {
+                    //TX
+                    db.beginTransaction();
+                    for (int i = 0; i < downloads.size(); i++) {
+                        //Check if exists
+                        Cursor cursor = db.rawQuery("SELECT id, state, quality FROM Downloads WHERE trackId == ? AND path == ?",
+                                new String[]{(String) downloads.get(i).get("trackId"), (String) downloads.get(i).get("path")});
+                        if (cursor.getCount() > 0) {
+                            //If done or error, set state to NONE - they should be skipped because file exists
+                            cursor.moveToNext();
+                            if (cursor.getInt(1) >= 3) {
+                                ContentValues values = new ContentValues();
+                                values.put("state", 0);
+                                values.put("quality", cursor.getInt(2));
+                                db.update("Downloads", values, "id == ?", new String[]{Integer.toString(cursor.getInt(0))});
+                                Log.d("INFO", "Already exists in DB, updating to none state!");
+                            } else {
+                                Log.d("INFO", "Already exits in DB!");
+                            }
+                            cursor.close();
+                            continue;
                         }
                         cursor.close();
-                        continue;
+
+                        //Insert
+                        ContentValues row = Download.flutterToSQL(downloads.get(i));
+                        db.insert("Downloads", null, row);
                     }
-                    cursor.close();
+                    db.setTransactionSuccessful();
+                    db.endTransaction();
+                    //Update service
+                    sendMessage(DownloadService.SERVICE_LOAD_DOWNLOADS, null);
 
-                    // Insert
-                    ContentValues row = Download.flutterToSQL(downloads.get(i));
-                    db.insert("Downloads", null, row);
+                    result.success(null);
+                    return;
                 }
-                db.setTransactionSuccessful();
-                db.endTransaction();
-                // Update service
-                sendMessage(DownloadService.SERVICE_LOAD_DOWNLOADS, null);
-
-                result.success(null);
-                return;
             }
 
-            // Get all downloads from DB
+            //Get all downloads from DB
             if (call.method.equals("getDownloads")) {
                 Cursor cursor = db.query("Downloads", null, null, null, null, null, null);
-                ArrayList downloads = new ArrayList();
-                // Parse downloads
+                ArrayList<HashMap<?,?>> downloads = new ArrayList<>();
+                //Parse downloads
                 while (cursor.moveToNext()) {
                     Download download = Download.fromSQL(cursor);
                     downloads.add(download.toHashMap());
@@ -120,7 +119,7 @@ public class MainActivity extends FlutterActivity {
                 result.success(downloads);
                 return;
             }
-            // Update settings from UI
+            //Update settings from UI
             if (call.method.equals("updateSettings")) {
                 Bundle bundle = new Bundle();
                 bundle.putString("json", call.argument("json").toString());
@@ -129,71 +128,71 @@ public class MainActivity extends FlutterActivity {
                 result.success(null);
                 return;
             }
-            // Load downloads from DB in service
+            //Load downloads from DB in service
             if (call.method.equals("loadDownloads")) {
                 sendMessage(DownloadService.SERVICE_LOAD_DOWNLOADS, null);
                 result.success(null);
                 return;
             }
-            // Start/Resume downloading
+            //Start/Resume downloading
             if (call.method.equals("start")) {
-                // Connected
+                //Connected
                 sendMessage(DownloadService.SERVICE_START_DOWNLOAD, null);
                 result.success(serviceBound);
                 return;
             }
-            // Stop downloading
+            //Stop downloading
             if (call.method.equals("stop")) {
                 sendMessage(DownloadService.SERVICE_STOP_DOWNLOADS, null);
                 result.success(null);
                 return;
             }
-            // Remove download
+            //Remove download
             if (call.method.equals("removeDownload")) {
                 Bundle bundle = new Bundle();
-                bundle.putInt("id", (int) call.argument("id"));
+                bundle.putInt("id", (int)call.argument("id"));
                 sendMessage(DownloadService.SERVICE_REMOVE_DOWNLOAD, bundle);
                 result.success(null);
                 return;
             }
-            // Retry download
+            //Retry download
             if (call.method.equals("retryDownloads")) {
                 sendMessage(DownloadService.SERVICE_RETRY_DOWNLOADS, null);
                 result.success(null);
                 return;
             }
-            // Remove downloads by state
+            //Remove downloads by state
             if (call.method.equals("removeDownloads")) {
                 Bundle bundle = new Bundle();
-                bundle.putInt("state", (int) call.argument("state"));
+                bundle.putInt("state", (int)call.argument("state"));
                 sendMessage(DownloadService.SERVICE_REMOVE_DOWNLOADS, bundle);
                 result.success(null);
                 return;
             }
-            // If app was started with preload info (Android Auto)
+            //If app was started with preload info (Android Auto)
             if (call.method.equals("getPreloadInfo")) {
                 result.success(intentPreload);
                 intentPreload = null;
                 return;
             }
-            // Get architecture
+            //Get architecture
             if (call.method.equals("arch")) {
                 result.success(System.getProperty("os.arch"));
                 return;
             }
-            // Start streaming server
+            //Start streaming server
             if (call.method.equals("startServer")) {
                 if (streamServer == null) {
-                    // Get offline path
+                    //Get offline path
                     String offlinePath = getExternalFilesDir("offline").getAbsolutePath();
-                    // Start server
+                    //Start server
                     streamServer = new StreamServer(call.argument("arl"), offlinePath);
                     streamServer.start();
                 }
                 result.success(null);
                 return;
             }
-            // Get quality info from stream
+            //Get quality info from stream
             if (call.method.equals("getStreamInfo")) {
                 if (streamServer == null) {
                     result.success(null);
@@ -206,34 +205,25 @@ public class MainActivity extends FlutterActivity {
                     result.success(null);
                 return;
             }
-            // Stop services
+            //Stop services
             if (call.method.equals("kill")) {
                 Intent intent = new Intent(this, DownloadService.class);
                 stopService(intent);
-                if (streamServer != null)
+                if (streamServer != null) {
                     streamServer.stop();
-                System.exit(0);
-            }
-            
-            // Check if can request package installs
-            if (call.method.equals("checkInstallPackagesPermission")) {
-                result.success(canRequestPackageInstalls());
-                return;
-            }
-
-            // Request install packages permission
-            if (call.method.equals("requestInstallPackagesPermission")) {
-                requestInstallPackagesPermission();
-                result.success(true);
+                    streamServer = null;
+                }
+                //System.exit(0);
+                result.success(null);
                 return;
             }
 
             result.error("0", "Not implemented!", "Not implemented!");
-        });
+        }));
 
-        // Event channel (for download updates)
+        //Event channel (for download updates)
         EventChannel eventChannel = new EventChannel(flutterEngine.getDartExecutor().getBinaryMessenger(), EVENT_CHANNEL);
-        eventChannel.setStreamHandler(new EventChannel.StreamHandler() {
+        eventChannel.setStreamHandler((new EventChannel.StreamHandler() {
             @Override
             public void onListen(Object arguments, EventChannel.EventSink events) {
                 eventSink = events;
@@ -243,32 +233,16 @@ public class MainActivity extends FlutterActivity {
             public void onCancel(Object arguments) {
                 eventSink = null;
             }
-        });
+        }));
     }
 
-    private boolean canRequestPackageInstalls() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            return getPackageManager().canRequestPackageInstalls();
-        } else {
-            return true;
-        }
-    }
-
-    private void requestInstallPackagesPermission() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            Intent intent = new Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES)
-                .setData(Uri.parse(String.format("package:%s", getPackageName())));
-            startActivity(intent);
-        }
-    }
-
-    // Start/Bind/Reconnect to download service
+    //Start/Bind/Reconnect to download service
     private void connectService() {
         if (serviceBound)
             return;
-        // Create messenger
+        //Create messenger
         activityMessenger = new Messenger(new IncomingHandler(this));
-        // Start
+        //Start
         Intent intent = new Intent(this, DownloadService.class);
         intent.putExtra("activityMessenger", activityMessenger);
         startService(intent);
@@ -280,20 +254,18 @@ public class MainActivity extends FlutterActivity {
         super.onStart();
 
         connectService();
-        // Get DB
+        //Get DB (and leave open!)
         DownloadsDatabase dbHelper = new DownloadsDatabase(getApplicationContext());
         db = dbHelper.getWritableDatabase();
 
-        // Trust all SSL Certs - Credits to Kilowatt36
+        //Trust all SSL Certs - Credits to Kilowatt36
         TrustManager[] trustAllCerts = new TrustManager[]{
                 new X509TrustManager() {
                     public java.security.cert.X509Certificate[] getAcceptedIssuers() {
                         return null;
                     }
-
                     public void checkClientTrusted(X509Certificate[] certs, String authType) {
                     }
-
                     public void checkServerTrusted(X509Certificate[] certs, String authType) {
                     }
                 }
@@ -311,7 +283,7 @@ public class MainActivity extends FlutterActivity {
     @Override
     protected void onResume() {
         super.onResume();
-        // Try reconnect
+        //Try reconnect
         connectService();
     }
 
@@ -324,18 +296,18 @@ public class MainActivity extends FlutterActivity {
     @Override
     protected void onDestroy() {
         super.onDestroy();
-        // Stop server
+        //Stop server
         if (streamServer != null)
             streamServer.stop();
 
-        // Unbind service on exit
+        //Unbind service on exit
         if (serviceBound) {
             unbindService(connection);
             serviceBound = false;
         }
     }
 
-    // Connection to download service
+    //Connection to download service
     private final ServiceConnection connection = new ServiceConnection() {
         @Override
         public void onServiceConnected(ComponentName componentName, IBinder iBinder) {
@@ -352,61 +324,67 @@ public class MainActivity extends FlutterActivity {
         }
     };
 
-    // Handler for incoming messages from service
-    class IncomingHandler extends Handler {
-        IncomingHandler(Context context) {
-            Context applicationContext = context.getApplicationContext();
+    //Handler for incoming messages from service
+    private static class IncomingHandler extends Handler {
+        private final WeakReference<MainActivity> weakReference;
+        IncomingHandler(MainActivity activity) {
+            super(Looper.getMainLooper());
+            this.weakReference = new WeakReference<>(activity);
         }
 
         @Override
-        public void handleMessage(Message msg) {
-            switch (msg.what) {
+        public void handleMessage(@NonNull Message msg) {
+            MainActivity activity = weakReference.get();
 
-                // Forward to flutter.
-                case DownloadService.SERVICE_ON_PROGRESS:
-                    if (eventSink == null) break;
-                    if (msg.getData().getParcelableArrayList("downloads").size() > 0) {
-                        // Generate HashMap ArrayList for sending to flutter
-                        ArrayList<HashMap> data = new ArrayList<>();
-                        for (int i = 0; i < msg.getData().getParcelableArrayList("downloads").size(); i++) {
-                            Bundle bundle = (Bundle) msg.getData().getParcelableArrayList("downloads").get(i);
-                            HashMap out = new HashMap();
-                            out.put("id", bundle.getInt("id"));
-                            out.put("state", bundle.getInt("state"));
-                            out.put("received", bundle.getLong("received"));
-                            out.put("filesize", bundle.getLong("filesize"));
-                            out.put("quality", bundle.getInt("quality"));
-                            data.add(out);
+            if (activity != null) {
+                EventChannel.EventSink eventSink = activity.eventSink;
+                switch (msg.what) {
+                    //Forward to flutter.
+                    case DownloadService.SERVICE_ON_PROGRESS:
+                        if (eventSink == null) break;
+                        ArrayList<Bundle> downloads = getParcelableArrayList(msg.getData(), "downloads", Bundle.class);
+                        if (downloads != null && downloads.size() > 0) {
+                            //Generate HashMap ArrayList for sending to flutter
+                            ArrayList<HashMap<String, Number>> data = new ArrayList<>();
+                            for (Bundle bundle : downloads) {
+                                HashMap<String, Number> out = new HashMap<>();
+                                out.put("id", bundle.getInt("id"));
+                                out.put("state", bundle.getInt("state"));
+                                out.put("received", bundle.getLong("received"));
+                                out.put("filesize", bundle.getLong("filesize"));
+                                out.put("quality", bundle.getInt("quality"));
+                                data.add(out);
+                            }
+                            //Wrapper
+                            HashMap<String, Object> out = new HashMap<>();
+                            out.put("action", "onProgress");
+                            out.put("data", data);
+                            eventSink.success(out);
                         }
-                        // Wrapper
-                        HashMap out = new HashMap();
-                        out.put("action", "onProgress");
-                        out.put("data", data);
+
+                        break;
+                    //State change, forward to flutter
+                    case DownloadService.SERVICE_ON_STATE_CHANGE:
+                        if (eventSink == null) break;
+                        Bundle b = msg.getData();
+                        HashMap<String, Object> out = new HashMap<>();
+                        out.put("running", b.getBoolean("running"));
+                        out.put("queueSize", b.getInt("queueSize"));
+
+                        //Wrapper info
+                        out.put("action", "onStateChange");
+
                         eventSink.success(out);
-                    }
+                        break;
 
-                    break;
-                // State change, forward to flutter
-                case DownloadService.SERVICE_ON_STATE_CHANGE:
-                    if (eventSink == null) break;
-                    Bundle b = msg.getData();
-                    HashMap out = new HashMap();
-                    out.put("running", b.getBoolean("running"));
-                    out.put("queueSize", b.getInt("queueSize"));
-
-                    // Wrapper info
-                    out.put("action", "onStateChange");
-
-                    eventSink.success(out);
-                    break;
-
-                default:
-                    super.handleMessage(msg);
+                    default:
+                        super.handleMessage(msg);
+                }
             }
         }
     }
 
-    // Send message to service
+    //Send message to service
     void sendMessage(int type, Bundle data) {
         if (serviceBound && serviceMessenger != null) {
             Message msg = Message.obtain(null, type);
@@ -417,5 +395,17 @@ public class MainActivity extends FlutterActivity {
                 e.printStackTrace();
             }
         }
+    }
+
+    @Nullable
+    public static <T extends Parcelable>  ArrayList<T> getParcelableArrayList(@Nullable Bundle bundle, @Nullable String key, @NonNull Class<T> clazz) {
+        if (bundle != null) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                return bundle.getParcelableArrayList(key, clazz);
+            } else {
+                return bundle.getParcelableArrayList(key);
+            }
+        }
+        return null;
     }
 }

@@ -1,36 +1,84 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:Saturn/api/deezer.dart';
-import 'package:Saturn/api/definitions.dart';
-import 'package:Saturn/api/player.dart';
-import 'package:Saturn/main.dart';
-import 'package:Saturn/ui/elements.dart';
-import 'package:Saturn/ui/error.dart';
-import 'package:Saturn/ui/menu.dart';
-import 'package:Saturn/translations.i18n.dart';
-import 'tiles.dart';
-import 'details_screens.dart';
+import 'package:get_it/get_it.dart';
+
+import '../api/deezer.dart';
+import '../api/definitions.dart';
+import '../service/audio_service.dart';
 import '../settings.dart';
+import '../translations.i18n.dart';
+import '../ui/elements.dart';
+import '../ui/error.dart';
+import '../ui/menu.dart';
+import 'details_screens.dart';
+import 'downloads_screen.dart';
+import 'settings_screen.dart';
+import 'tiles.dart';
 
 class HomeScreen extends StatelessWidget {
+  const HomeScreen({super.key});
+
   @override
   Widget build(BuildContext context) {
-    return SingleChildScrollView(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: <Widget>[
-          SafeArea(child: Container()),
-          Flexible(child: HomePageScreen(),)
-        ],
-      ),
+    return Scaffold(
+        appBar: const HomeAppBar(),
+        body: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: <Widget>[
+              SafeArea(child: Container()),
+              const Flexible(
+                child: HomePageScreen(),
+              )
+            ],
+          ),
+        ));
+  }
+}
+
+class HomeAppBar extends StatelessWidget implements PreferredSizeWidget {
+  const HomeAppBar({super.key});
+
+  @override
+  Size get preferredSize => AppBar().preferredSize;
+
+  @override
+  Widget build(BuildContext context) {
+    return FreezerAppBar(
+      'Home'.i18n,
+      actions: <Widget>[
+        IconButton(
+          icon: Icon(
+            Icons.file_download,
+            semanticLabel: 'Download'.i18n,
+          ),
+          onPressed: () {
+            Navigator.of(context).push(MaterialPageRoute(
+                builder: (context) => const DownloadsScreen()));
+          },
+        ),
+        IconButton(
+          icon: Icon(
+            Icons.settings,
+            semanticLabel: 'Settings'.i18n,
+          ),
+          onPressed: () {
+            Navigator.of(context).push(MaterialPageRoute(
+                builder: (context) => const SettingsScreen()));
+          },
+        ),
+      ],
     );
   }
 }
 
-class freezerTitle extends StatelessWidget {
+class FreezerTitle extends StatelessWidget {
+  const FreezerTitle({super.key});
+
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: EdgeInsets.fromLTRB(0, 24, 0, 8),
+      padding: const EdgeInsets.fromLTRB(0, 24, 0, 8),
       child: Row(
         mainAxisSize: MainAxisSize.max,
         mainAxisAlignment: MainAxisAlignment.center,
@@ -39,12 +87,9 @@ class freezerTitle extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             children: <Widget>[
               Image.asset('assets/icon.png', width: 64, height: 64),
-              Text(
+              const Text(
                 'Saturn',
-                style: TextStyle(
-                    fontSize: 56,
-                    fontWeight: FontWeight.w900
-                ),
+                style: TextStyle(fontSize: 56, fontWeight: FontWeight.w900),
               )
             ],
           )
@@ -54,258 +99,229 @@ class freezerTitle extends StatelessWidget {
   }
 }
 
-
-
 class HomePageScreen extends StatefulWidget {
-
-  final HomePage homePage;
-  final DeezerChannel channel;
-  HomePageScreen({this.homePage, this.channel, Key key}): super(key: key);
+  final HomePage? homePage;
+  final DeezerChannel? channel;
+  const HomePageScreen({this.homePage, this.channel, super.key});
 
   @override
   _HomePageScreenState createState() => _HomePageScreenState();
 }
 
 class _HomePageScreenState extends State<HomePageScreen> {
-  HomePage _homePage;
+  HomePage? _homePage;
   bool _cancel = false;
   bool _error = false;
 
   void _loadChannel() async {
-    debugPrint('Loading channel');
-    HomePage _hp;
+    HomePage? hp;
+    //Fetch channel from api
     try {
-      _hp = await deezerAPI.getChannel(widget.channel.target);
-      debugPrint('Channel loaded: $_hp');
-    } catch (e, stackTrace) {
-      debugPrint('Error loading channel: $e\n$stackTrace');
+      hp = await deezerAPI.getChannel(widget.channel?.target ?? '');
+    } catch (e) {
+      if (kDebugMode) {
+        print(e);
+      }
     }
-    if (_hp == null) {
-      debugPrint('Channel load failed');
+    if (hp == null) {
+      //On error
       setState(() => _error = true);
       return;
     }
-    setState(() {
-      _homePage = _hp;
-      _error = false;
-    });
+    setState(() => _homePage = hp);
   }
 
   void _loadHomePage() async {
-    debugPrint('Loading homepage from local storage');
+    //Load local
     try {
-      HomePage _hp = await HomePage().load();
-      setState(() => _homePage = _hp);
-      debugPrint('Homepage loaded from local storage: $_hp');
-    } catch (e, stackTrace) {
-      debugPrint('Error loading homepage from local storage: $e\n$stackTrace');
+      HomePage hp = await HomePage().load();
+      setState(() => _homePage = hp);
+    } catch (e) {
+      if (kDebugMode) {
+        print(e);
+      }
     }
-    
+    //On background load from API
     try {
       if (settings.offlineMode) await deezerAPI.authorize();
-      debugPrint('Loading homepage from API');
-      HomePage _hp = await deezerAPI.homePage();
-      if (_hp != null) {
-        if (_cancel) {
-          debugPrint('Homepage load cancelled');
-          return;
-        }
-        if (_hp.sections.isEmpty) {
-          debugPrint('Homepage sections are empty');
-          return;
-        }
-        setState(() => _homePage = _hp);
-        await _homePage.save();
-        debugPrint('Homepage loaded from API and saved to cache: $_hp');
+      HomePage hp = await deezerAPI.homePage();
+      if (_cancel) return;
+      if (hp.sections.isEmpty) return;
+      setState(() => _homePage = hp);
+      //Save to cache
+      await _homePage?.save();
+    } catch (e) {
+      if (kDebugMode) {
+        print(e);
       }
-    } catch (e, stackTrace) {
-      debugPrint('Error loading homepage from API: $e\n$stackTrace');
     }
   }
 
   void _load() {
     if (widget.channel != null) {
       _loadChannel();
-    } else if (widget.channel == null && widget.homePage == null) {
-      _loadHomePage();
-    } else if (widget.homePage.sections == null || widget.homePage.sections.isEmpty) {
-      _loadHomePage();
-    } else {
-      debugPrint('Using existing homepage data');
-      setState(() => _homePage = widget.homePage);
+      return;
     }
+    if (widget.channel == null && widget.homePage == null) {
+      _loadHomePage();
+      return;
+    }
+    if (widget.homePage?.sections == null ||
+        widget.homePage!.sections.isEmpty) {
+      _loadHomePage();
+      return;
+    }
+    //Already have data
+    setState(() => _homePage = widget.homePage);
   }
 
   @override
   void initState() {
     super.initState();
-    debugPrint('Init state');
     _load();
   }
 
   @override
   void dispose() {
     _cancel = true;
-    debugPrint('Disposed');
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     if (_homePage == null) {
-      debugPrint('Homepage is null, showing CircularProgressIndicator');
       return Center(
-        child: Padding(
-          padding: EdgeInsets.all(8.0),
-          child: CircularProgressIndicator(color: Theme.of(context).primaryColor),
-        ),
-      );
+          child: Padding(
+        padding: EdgeInsets.all(8.0),
+        child: CircularProgressIndicator(color: Theme.of(context).primaryColor,),
+      ));
     }
-    if (_error) {
-      debugPrint('Error state, showing ErrorScreen');
-      return ErrorScreen();
-    }
-    debugPrint('Building homepage with ${_homePage.sections.length} sections');
+    if (_error) return const ErrorScreen();
     return Column(
-      children: List.generate(
-        _homePage.sections.length,
-        (i) {
-          switch (_homePage.sections[i].layout) {
-            case HomePageSectionLayout.ROW:
-              return HomepageRowSection(_homePage.sections[i]);
-            case HomePageSectionLayout.GRID:
-              return HomePageGridSection(_homePage.sections[i]);
-            default:
-              return HomepageRowSection(_homePage.sections[i]);
-          }
-        },
-      ),
-    );
+        children: List.generate(
+      _homePage?.sections.length ?? 0,
+      (i) {
+        switch (_homePage!.sections[i].layout) {
+          case HomePageSectionLayout.ROW:
+            return HomepageRowSection(_homePage!.sections[i]);
+          case HomePageSectionLayout.GRID:
+            return HomePageGridSection(_homePage!.sections[i]);
+          default:
+            return HomepageRowSection(_homePage!.sections[i]);
+        }
+      },
+    ));
   }
 }
 
-
-
 class HomepageRowSection extends StatelessWidget {
-
   final HomePageSection section;
-  HomepageRowSection(this.section);
+  const HomepageRowSection(this.section, {super.key});
 
   @override
   Widget build(BuildContext context) {
     return ListTile(
-      contentPadding: (section.title == "Mixes inspired by...")?EdgeInsets.symmetric(vertical: 0.0, horizontal: 0.0):EdgeInsets.symmetric(horizontal: 4.0, vertical: 2.0),
-      title: Padding(
-        padding: (section.title == "Mixes inspired by...")?EdgeInsets.symmetric(vertical: 0.0, horizontal: 0.0):EdgeInsets.symmetric(vertical: 4.0, horizontal: 6.0),
-        child: Text(
-          (section.title == "Mixes inspired by...")?'':(section.title)??'',
-          textAlign: TextAlign.left,
-          maxLines: 2,
-          overflow: TextOverflow.ellipsis,
-          style: TextStyle(
-            fontSize: 20.0,
-            fontWeight: FontWeight.w900
+        contentPadding:
+            const EdgeInsets.symmetric(horizontal: 4.0, vertical: 2.0),
+        title: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 4.0, horizontal: 6.0),
+          child: Text(
+            section.title ?? '',
+            textAlign: TextAlign.left,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(fontSize: 20.0, fontWeight: FontWeight.w900),
           ),
         ),
-      ),
-      subtitle: SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
-        child: Row(
-          children: List.generate(section.items.length + 1, (j) {
-            //Has more items
-            if (j == section.items.length) {
-              if (section.hasMore ?? false) {
-                return TextButton(
-                  child: Text(
-                    'Show more'.i18n,
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                        fontSize: 20.0
+        subtitle: SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: Row(
+            children: List.generate((section.items?.length ?? 0) + 1, (j) {
+              //Has more items
+              if (j == (section.items?.length ?? 0)) {
+                if (section.hasMore ?? false) {
+                  return TextButton(
+                    
+                    child: Text(
+                      'Show more'.i18n,
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(fontSize: 20.0),
                     ),
-                  ),
-                  onPressed: () => Navigator.of(context).push(MaterialPageRoute(
-                    builder: (context) => Scaffold(
-                      appBar: freezerAppBar(section.title),
-                      body: SingleChildScrollView(
-                        child: HomePageScreen(
-                          channel: DeezerChannel(target: section.pagePath)
-                        )
+                    onPressed: () =>
+                        Navigator.of(context).push(MaterialPageRoute(
+                      builder: (context) => Scaffold(
+                        appBar: FreezerAppBar(section.title ?? ''),
+                        body: SingleChildScrollView(
+                            child: HomePageScreen(
+                                channel:
+                                    DeezerChannel(target: section.pagePath))),
                       ),
-                    ),
-                  )),
-                );
+                    )),
+                  );
+                }
+                return const SizedBox(height: 0, width: 0);
               }
-              return Container(height: 0, width: 0);
-            }
 
-            //Show item
-            HomePageItem item = section.items[j];
-            return HomePageItemWidget(item);
-          }),
-        ),
-      )
-    );
+              //Show item
+              HomePageItem item = section.items![j] ?? HomePageItem();
+              return HomePageItemWidget(item);
+            }),
+          ),
+        ));
   }
 }
 
 class HomePageGridSection extends StatelessWidget {
-
   final HomePageSection section;
-  HomePageGridSection(this.section);
+  const HomePageGridSection(this.section, {super.key});
 
   @override
   Widget build(BuildContext context) {
     return ListTile(
-      contentPadding: (section.title == "Mixes inspired by...")?EdgeInsets.symmetric(vertical: 0.0, horizontal: 0.0):EdgeInsets.symmetric(horizontal: 4.0, vertical: 2.0),
+      contentPadding:
+          const EdgeInsets.symmetric(horizontal: 4.0, vertical: 2.0),
       title: Padding(
-        padding: (section.title == "Mixes inspired by...")?EdgeInsets.symmetric(vertical: 0.0, horizontal: 0.0):EdgeInsets.symmetric(vertical: 4.0, horizontal: 6.0),
+        padding: const EdgeInsets.symmetric(vertical: 4.0, horizontal: 6.0),
         child: Text(
-          section.title??'',
+          section.title ?? '',
           textAlign: TextAlign.left,
           maxLines: 2,
           overflow: TextOverflow.ellipsis,
-          style: TextStyle(
-              fontSize: 20.0,
-              fontWeight: FontWeight.w900
-          ),
+          style: const TextStyle(fontSize: 20.0, fontWeight: FontWeight.w900),
         ),
       ),
       subtitle: Wrap(
         alignment: WrapAlignment.spaceAround,
-        children: List.generate(section.items.length, (i) {
-
+        children: List.generate(section.items!.length, (i) {
           //Item
-          return HomePageItemWidget(section.items[i]);
+          return HomePageItemWidget(section.items![i] ?? HomePageItem());
         }),
       ),
     );
   }
 }
 
-
-
-
 class HomePageItemWidget extends StatelessWidget {
-
-  HomePageItem item;
-  HomePageItemWidget(this.item);
+  final HomePageItem item;
+  const HomePageItemWidget(this.item, {super.key});
 
   @override
   Widget build(BuildContext context) {
-
     switch (item.type) {
+      case HomePageItemType.FLOW:
+        return FlowTrackListTile(
+          item.value,
+          onTap: () {
+            DeezerFlow deezerFlow = item.value;
+            GetIt.I<AudioPlayerHandler>().playFromSmartTrackList(SmartTrackList(
+                id: 'flow', title: deezerFlow.title, flowType: deezerFlow.id));
+          },
+        );
       case HomePageItemType.SMARTTRACKLIST:
         return SmartTrackListTile(
           item.value,
           onTap: () {
-            playerHelper.playFromSmartTrackList(item.value);
-          },
-        );
-      case HomePageItemType.FLOW:
-        return FlowTile(
-          item.value,
-          onTap: () {
-            playerHelper.playFromSmartTrackList(SmartTrackList(id: item.value.id));
+            GetIt.I<AudioPlayerHandler>().playFromSmartTrackList(item.value);
           },
         );
       case HomePageItemType.ALBUM:
@@ -313,12 +329,11 @@ class HomePageItemWidget extends StatelessWidget {
           item.value,
           onTap: () {
             Navigator.of(context).push(MaterialPageRoute(
-                builder: (context) => AlbumDetails(item.value)
-            ));
+                builder: (context) => AlbumDetails(item.value)));
           },
           onHold: () {
-            MenuSheet m = MenuSheet(context);
-            m.defaultAlbumMenu(item.value);
+            MenuSheet m = MenuSheet();
+            m.defaultAlbumMenu(item.value, context: context);
           },
         );
       case HomePageItemType.ARTIST:
@@ -326,12 +341,11 @@ class HomePageItemWidget extends StatelessWidget {
           item.value,
           onTap: () {
             Navigator.of(context).push(MaterialPageRoute(
-                builder: (context) => ArtistDetails(item.value)
-            ));
+                builder: (context) => ArtistDetails(item.value)));
           },
           onHold: () {
-            MenuSheet m = MenuSheet(context);
-            m.defaultArtistMenu(item.value);
+            MenuSheet m = MenuSheet();
+            m.defaultArtistMenu(item.value, context: context);
           },
         );
       case HomePageItemType.PLAYLIST:
@@ -339,12 +353,11 @@ class HomePageItemWidget extends StatelessWidget {
           item.value,
           onTap: () {
             Navigator.of(context).push(MaterialPageRoute(
-                builder: (context) => PlaylistDetails(item.value)
-            ));
+                builder: (context) => PlaylistDetails(item.value)));
           },
           onHold: () {
-            MenuSheet m = MenuSheet(context);
-            m.defaultPlaylistMenu(item.value);
+            MenuSheet m = MenuSheet();
+            m.defaultPlaylistMenu(item.value, context: context);
           },
         );
       case HomePageItemType.CHANNEL:
@@ -353,12 +366,12 @@ class HomePageItemWidget extends StatelessWidget {
           onTap: () {
             Navigator.of(context).push(MaterialPageRoute(
                 builder: (context) => Scaffold(
-                  appBar: freezerAppBar(item.value.title.toString()),
-                  body: SingleChildScrollView(
-                    child: HomePageScreen(channel: item.value,)
-                  ),
-                )
-            ));
+                      appBar: FreezerAppBar(item.value.title.toString()),
+                      body: SingleChildScrollView(
+                          child: HomePageScreen(
+                        channel: item.value,
+                      )),
+                    )));
           },
         );
       case HomePageItemType.SHOW:
@@ -366,11 +379,11 @@ class HomePageItemWidget extends StatelessWidget {
           item.value,
           onTap: () {
             Navigator.of(context).push(MaterialPageRoute(
-              builder: (context) => ShowScreen(item.value)
-            ));
+                builder: (context) => ShowScreen(item.value)));
           },
         );
+      default:
+        return const SizedBox(height: 0, width: 0);
     }
-    return Container(height: 0, width: 0);
   }
 }

@@ -1,59 +1,69 @@
 import 'dart:async';
 
-import 'package:audio_service/audio_service.dart';
+import 'package:app_links/app_links.dart';
 import 'package:custom_navigator/custom_navigator.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_displaymode/flutter_displaymode.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
-import 'package:Saturn/api/cache.dart';
-import 'package:Saturn/api/definitions.dart';
-import 'package:Saturn/ui/library.dart';
-import 'package:Saturn/ui/login_screen.dart';
-import 'package:Saturn/ui/search.dart';
-import 'package:Saturn/ui/updater.dart';
-import 'package:i18n_extension/i18n_widget.dart';
+import 'package:get_it/get_it.dart';
+import 'package:i18n_extension/i18n_extension.dart';
+import 'package:logging/logging.dart';
 import 'package:move_to_background/move_to_background.dart';
-import 'package:Saturn/translations.i18n.dart';
+import 'package:permission_handler/permission_handler.dart';
 import 'package:quick_actions/quick_actions.dart';
-import 'package:uni_links/uni_links.dart';
+//import 'package:restart_app/restart_app.dart';
 
+import 'api/cache.dart';
 import 'api/deezer.dart';
+import 'api/definitions.dart';
 import 'api/download.dart';
-import 'api/player.dart';
+import 'service/audio_service.dart';
+import 'service/service_locator.dart';
 import 'settings.dart';
+import 'translations.i18n.dart';
 import 'ui/home_screen.dart';
+import 'ui/library.dart';
+import 'ui/login_screen.dart';
 import 'ui/player_bar.dart';
+//import 'ui/updater.dart';
+import 'ui/search.dart';
+import 'utils/logging.dart';
+import 'utils/navigator_keys.dart';
+import 'ui/restartable.dart';
 
-
-Function updateTheme;
-Function logOut;
-GlobalKey<NavigatorState> mainNavigatorKey = GlobalKey<NavigatorState>();
-GlobalKey<NavigatorState> navigatorKey;
-
+late Function updateTheme;
+late Function logOut;
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  //Initialize globals
+  await Permission.notification.isDenied.then((value) {
+    if (value) {
+      Permission.notification.request();
+    }
+  });
+
+  await prepareRun();
+
+  runApp(const Restartable(child: SaturnApp()));
+}
+
+Future<void> prepareRun() async {
+  await initializeLogging();
+  Logger.root.info('Starting Saturn App...');
   settings = await Settings().loadSettings();
-  await downloadManager.init();
   cache = await Cache.load();
-
-  //Do on BG
-  playerHelper.authorizeLastFM();
-
-  runApp(freezerApp());
 }
 
-class freezerApp extends StatefulWidget {
+class SaturnApp extends StatefulWidget {
+  const SaturnApp({super.key});
+
   @override
-  _freezerAppState createState() => _freezerAppState();
+  _SaturnAppState createState() => _SaturnAppState();
 }
 
-class _freezerAppState extends State<freezerApp> {
-
+class _SaturnAppState extends State<SaturnApp> {
   @override
   void initState() {
     //Make update theme global
@@ -72,45 +82,51 @@ class _freezerAppState extends State<freezerApp> {
       settings.themeData;
     });
     SystemChrome.setSystemUIOverlayStyle(SystemUiOverlayStyle(
-      systemNavigationBarColor: settings.themeData.bottomAppBarColor,
-      systemNavigationBarIconBrightness: settings.isDark ? Brightness.light : Brightness.dark,
+      systemNavigationBarColor: settings.themeData.bottomAppBarTheme.color,
+      systemNavigationBarIconBrightness:
+          settings.isDark ? Brightness.light : Brightness.dark,
     ));
   }
 
-  Locale _locale() {
-    if (settings.language == null || settings.language.split('_').length < 2) return null;
-    return Locale(settings.language.split('_')[0], settings.language.split('_')[1]);
+  Locale? _locale() {
+    if ((settings.language?.split('_').length ?? 0) < 2) return null;
+    return Locale(
+        settings.language!.split('_')[0], settings.language!.split('_')[1]);
   }
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      debugShowCheckedModeBanner: false,
       title: 'Saturn',
-      //shortcuts: <LogicalKeySet, Intent>{
-        //...WidgetsApp.defaultShortcuts,
-       // //LogicalKeySet(LogicalKeyboardKey.select): const ActivateIntent(), // DPAD center key, for remote controls
-      //},
+      shortcuts: <ShortcutActivator, Intent>{
+        ...WidgetsApp.defaultShortcuts,
+        LogicalKeySet(LogicalKeyboardKey.select):
+            const ActivateIntent(), // DPAD center key, for remote controls
+      },
       theme: settings.themeData,
-      localizationsDelegates: [
+      localizationsDelegates: const [
         GlobalMaterialLocalizations.delegate,
         GlobalWidgetsLocalizations.delegate,
         GlobalCupertinoLocalizations.delegate,
       ],
       supportedLocales: supportedLocales,
-      home: WillPopScope(
-        onWillPop: () async {
-          //For some reason AudioServiceWidget caused the app to freeze after 2 back button presses. "fix"
-          if (navigatorKey.currentState.canPop()) {
-            await navigatorKey.currentState.maybePop();
-            return false;
+      home: PopScope(
+        canPop: false, // Prevent full app exit
+        onPopInvoked: (bool didPop) async {
+          // When at least 1 layer inside a custom navigator screen,
+          // let the back button move back down the custom navigator stack
+          if (customNavigatorKey.currentState!.canPop()) {
+            await customNavigatorKey.currentState!.maybePop();
+            return;
           }
+
+          // When on a root screen of the custom navigator, move app to background with back button
           await MoveToBackground.moveTaskToBack();
-          return false;
+          return;
         },
         child: I18n(
           initialLocale: _locale(),
-          child: LoginMainWrapper(),
+          child: const LoginMainWrapper(),
         ),
       ),
       navigatorKey: mainNavigatorKey,
@@ -120,6 +136,8 @@ class _freezerAppState extends State<freezerApp> {
 
 //Wrapper for login and main screen.
 class LoginMainWrapper extends StatefulWidget {
+  const LoginMainWrapper({super.key});
+
   @override
   _LoginMainWrapperState createState() => _LoginMainWrapperState();
 }
@@ -127,284 +145,352 @@ class LoginMainWrapper extends StatefulWidget {
 class _LoginMainWrapperState extends State<LoginMainWrapper> {
   @override
   void initState() {
-    if (settings.arl != null) {
-      playerHelper.start();
-      //Load token on background
-      deezerAPI.arl = settings.arl;
-      settings.offlineMode = true;
-      deezerAPI.authorize().then((b) async {
-        if (b) setState(() => settings.offlineMode = false);
-      });
-    }
+    super.initState();
+    //GetIt.I<AudioPlayerHandler>().start();
+    //Load token on background
+    deezerAPI.arl = settings.arl;
+    settings.offlineMode = true;
+    deezerAPI.authorize().then((b) async {
+      if (b) setState(() => settings.offlineMode = false);
+    });
     //Global logOut function
     logOut = _logOut;
-
-    super.initState();
   }
 
   Future _logOut() async {
+    try {
+      GetIt.I<AudioPlayerHandler>().stop();
+      GetIt.I<AudioPlayerHandler>().updateQueue([]);
+      GetIt.I<AudioPlayerHandler>().removeSavedQueueFile();
+    } catch (e, st) {
+      Logger.root.severe(
+          'Error stopping and clearing audio service before logout', e, st);
+    }
+    await downloadManager.stop();
+    await DownloadManager.platform.invokeMethod('kill');
     setState(() {
       settings.arl = null;
       settings.offlineMode = false;
-      deezerAPI = new DeezerAPI();
+      deezerAPI = DeezerAPI();
     });
     await settings.save();
     await Cache.wipe();
+    Restartable.restart();
+    //Restart.restartApp();
   }
 
   @override
   Widget build(BuildContext context) {
-    if (settings.arl == null)
+    if (settings.arl == null) {
       return LoginWidget(
         callback: () => setState(() => {}),
       );
-    return MainScreen();
+    }
+    return const MainScreen();
   }
 }
 
 class MainScreen extends StatefulWidget {
+  const MainScreen({super.key});
+
   @override
   _MainScreenState createState() => _MainScreenState();
 }
 
-class _MainScreenState extends State<MainScreen> with SingleTickerProviderStateMixin, WidgetsBindingObserver {
-  List<Widget> _screens = [HomeScreen(), SearchScreen(), LibraryScreen()];
+class _MainScreenState extends State<MainScreen>
+    with SingleTickerProviderStateMixin {
+  late final AppLifecycleListener _lifeCycleListener;
+  final List<Widget> _screens = [
+    const HomeScreen(),
+    const SearchScreen(),
+    const LibraryScreen()
+  ];
+  Future<void>? _initialization;
   int _selected = 0;
-  StreamSubscription _urlLinkStream;
+  StreamSubscription? _urlLinkStream;
   int _keyPressed = 0;
-  bool textFieldVisited = false;
 
   @override
   void initState() {
-    navigatorKey = GlobalKey<NavigatorState>();
+    _lifeCycleListener =
+        AppLifecycleListener(onStateChange: _onLifeCycleChanged);
+    _initialization = _init();
+    super.initState();
+  }
 
+  Future<void> _init() async {
     //Set display mode
-    if (settings.displayMode != null && settings.displayMode >= 0) {
+    if ((settings.displayMode ?? -1) >= 0) {
       FlutterDisplayMode.supported.then((modes) async {
-        if (modes.length - 1 >= settings.displayMode)
-          FlutterDisplayMode.setPreferredMode(modes[settings.displayMode]);
+        if (modes.length - 1 >= settings.displayMode!.toInt()) {
+          FlutterDisplayMode.setPreferredMode(
+              modes[settings.displayMode!.toInt()]);
+        }
       });
     }
 
+    _preloadFavoriteTracksToCache();
+    _initDownloadManager();
     _startStreamingServer();
+    await _setupServiceLocator();
+
+    //Do on BG
+    GetIt.I<AudioPlayerHandler>().authorizeLastFM();
 
     //Start with parameters
-    _setupUniLinks();
+    _setupDeepLinks();
     _loadPreloadInfo();
     _prepareQuickActions();
 
     //Check for updates on background
+    /* No automatic updates yet
     Future.delayed(Duration(seconds: 5), () {
-      freezerVersions.checkUpdate();
+      FreezerVersions.checkUpdate();
     });
+    */
 
-    super.initState();
-    WidgetsBinding.instance.addObserver(this);
+    //Restore saved queue
+    _loadSavedQueue();
+  }
+
+  void _preloadFavoriteTracksToCache() async {
+    try {
+      cache.libraryTracks = await deezerAPI.getFavoriteTrackIds();
+      Logger.root
+          .info('Cached favorite trackIds: ${cache.libraryTracks?.length}');
+    } catch (e, st) {
+      Logger.root.severe('Error loading favorite trackIds!', e, st);
+    }
+  }
+
+  void _initDownloadManager() async {
+    await downloadManager.init();
   }
 
   void _startStreamingServer() async {
-    await DownloadManager.platform.invokeMethod("startServer", {"arl": settings.arl});
+    await DownloadManager.platform
+        .invokeMethod('startServer', {'arl': settings.arl});
+  }
+
+  Future<void> _setupServiceLocator() async {
+    await setupServiceLocator();
+    // Wait for the player to be initialized
+    await GetIt.I<AudioPlayerHandler>().waitForPlayerInitialization();
   }
 
   void _prepareQuickActions() {
-    final QuickActions quickActions = QuickActions();
+    const QuickActions quickActions = QuickActions();
     quickActions.initialize((type) {
-      if (type != null)
-        _startPreload(type);
+      _startPreload(type);
     });
 
     //Actions
     quickActions.setShortcutItems([
-      ShortcutItem(type: 'favorites', localizedTitle: 'Favorites'.i18n, icon: 'ic_favorites'),
+      ShortcutItem(
+          type: 'favorites',
+          localizedTitle: 'Favorites'.i18n,
+          icon: 'ic_favorites'),
       ShortcutItem(type: 'flow', localizedTitle: 'Flow'.i18n, icon: 'ic_flow'),
-
     ]);
   }
 
   void _startPreload(String type) async {
     await deezerAPI.authorize();
     if (type == 'flow') {
-      await playerHelper.playFromSmartTrackList(SmartTrackList(id: 'flow'));
+      await GetIt.I<AudioPlayerHandler>()
+          .playFromSmartTrackList(SmartTrackList(id: 'flow'));
       return;
     }
     if (type == 'favorites') {
-      Playlist p = await deezerAPI.fullPlaylist(deezerAPI.favoritesPlaylistId);
-      playerHelper.playFromPlaylist(p, p.tracks[0].id);
+      Playlist p = await deezerAPI
+          .fullPlaylist(deezerAPI.favoritesPlaylistId.toString());
+      GetIt.I<AudioPlayerHandler>().playFromPlaylist(p, p.tracks?[0].id ?? '');
     }
   }
 
   void _loadPreloadInfo() async {
-    String info = await DownloadManager.platform.invokeMethod('getPreloadInfo');
-    if (info != null) {
-      //Used if started from android auto
-      await deezerAPI.authorize();
-      _startPreload(info);
-    }
+    String info =
+        await DownloadManager.platform.invokeMethod('getPreloadInfo') ?? '';
+    if (info.isEmpty) return;
+    _startPreload(info);
+  }
+
+  Future<void> _loadSavedQueue() async {
+    GetIt.I<AudioPlayerHandler>().loadQueueFromFile();
   }
 
   @override
   void dispose() {
-    if (_urlLinkStream != null)
-      _urlLinkStream.cancel();
-    WidgetsBinding.instance.removeObserver(this);
+    _urlLinkStream?.cancel();
+    _lifeCycleListener.dispose();
     super.dispose();
   }
 
-  @override
-  void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.resumed) {
-      setState(() {
-        textFieldVisited = false;
-      });
+  void _onLifeCycleChanged(AppLifecycleState state) {
+    switch (state) {
+      case AppLifecycleState.detached:
+        Logger.root.info('App detached.');
+        GetIt.I<AudioPlayerHandler>().dispose();
+        downloadManager.stop();
+      case AppLifecycleState.resumed:
+      case AppLifecycleState.inactive:
+      case AppLifecycleState.hidden:
+      case AppLifecycleState.paused:
     }
   }
 
-  void _setupUniLinks() async {
-    //Listen to URLs
-    _urlLinkStream = getUriLinksStream().listen((Uri uri) {
-      openScreenByURL(context, uri.toString());
-    }, onError: (err) {});
-    //Get initial link on cold start
-    try {
-      String link = await getInitialLink();
-      if (link != null && link.length > 4)
-        openScreenByURL(context, link);
-    } catch (e) {}
+  void _setupDeepLinks() async {
+    AppLinks deepLinks = AppLinks();
+
+    // Check initial link if app was in cold state (terminated)
+    final deepLink = await deepLinks.getInitialLinkString();
+    if (deepLink != null && deepLink.length > 4) {
+      Logger.root.info('Opening app from deeplink: $deepLink');
+      openScreenByURL(deepLink);
+    }
+
+    //Listen to URLs when app is in warm state (front or background)
+    _urlLinkStream = deepLinks.stringLinkStream.listen((deeplink) {
+      Logger.root.info('Opening deeplink: $deeplink');
+      openScreenByURL(deeplink);
+    }, onError: (e) {
+      Logger.root.severe('Error handling app link: $e');
+    });
   }
 
-  ValueChanged<RawKeyEvent> _handleKey(FocusScopeNode navigationBarFocusNode, FocusNode screenFocusNode){
-    return (event) {
-      FocusNode primaryFocus = FocusManager.instance.primaryFocus;
-      // After visiting text field, something goes wrong and KeyDown events are not sent, only KeyUp-s.
-      // So, set this flag to indicate a transition to other "mode"
-      if (primaryFocus.context.widget.runtimeType.toString() == 'EditableText') {
-        setState(() {
-          textFieldVisited = true;
-        });
-      }
-      // Movement to navigation bar and back
-      if (event.runtimeType.toString() == (textFieldVisited ? 'RawKeyUpEvent' : 'RawKeyDownEvent')) {
-        int keyCode = (event.data as RawKeyEventDataAndroid).keyCode;
-        switch (keyCode) {
-          case 127: // Menu on Android TV
-          case 327: // EPG on Hisense TV
-            focusToNavbar(navigationBarFocusNode);
-            break;
-          case 22: // LEFT + RIGHT
-          case 21:
-            if (_keyPressed == 21 && keyCode == 22 || _keyPressed == 22 && keyCode == 21) {
-              focusToNavbar(navigationBarFocusNode);
-            }
-            _keyPressed = keyCode;
-            Future.delayed(Duration(milliseconds: 100), () =>  {
-              _keyPressed = 0
-            });
-            break;
-          case 20: // DOWN
-            // If it's bottom row, go to navigation bar
-            var row = primaryFocus.parent;
-            if (row != null) {
-              var column = row.parent;   
-              if (column.children.last == row) {
-                focusToNavbar(navigationBarFocusNode);
-              }
-            }
-            break;
-          case 19: // UP
-            if (navigationBarFocusNode.hasFocus) {
-              screenFocusNode.parent.parent.children.last // children.last is used for handling "playlists" screen in library. Under CustomNavigator 2 screens appears.
-                  .nextFocus(); // nextFocus is used instead of requestFocus because it focuses on last, bottom, non-visible tile of main page
+  void _handleKey(KeyEvent event, FocusScopeNode navigationBarFocusNode,
+      FocusNode screenFocusNode) {
+    FocusNode? primaryFocus = FocusManager.instance.primaryFocus;
 
-            }
-            break;
+    // Movement to navigation bar and back
+    if (event is KeyDownEvent) {
+      final logicalKey = event.logicalKey;
+      final keyCode = logicalKey.keyId;
+
+      if (logicalKey == LogicalKeyboardKey.tvContentsMenu) {
+        // Menu key on Android TV
+        focusToNavbar(navigationBarFocusNode);
+      } else if (keyCode == 0x100070000127) {
+        // EPG key on Hisense TV (example, you need to find correct LogicalKeyboardKey or define it)
+        focusToNavbar(navigationBarFocusNode);
+      } else if (logicalKey == LogicalKeyboardKey.arrowLeft ||
+          logicalKey == LogicalKeyboardKey.arrowRight) {
+        if ((_keyPressed == LogicalKeyboardKey.arrowLeft.keyId &&
+                logicalKey == LogicalKeyboardKey.arrowRight) ||
+            (_keyPressed == LogicalKeyboardKey.arrowRight.keyId &&
+                logicalKey == LogicalKeyboardKey.arrowLeft)) {
+          // LEFT + RIGHT
+          focusToNavbar(navigationBarFocusNode);
+        }
+        _keyPressed = logicalKey.keyId;
+        Future.delayed(const Duration(milliseconds: 100), () {
+          _keyPressed = 0;
+        });
+      } else if (logicalKey == LogicalKeyboardKey.arrowDown) {
+        // If it's bottom row, go to navigation bar
+        var row = primaryFocus?.parent;
+        if (row != null) {
+          var column = row.parent;
+          if (column?.children.last == row) {
+            focusToNavbar(navigationBarFocusNode);
+          }
+        }
+      } else if (logicalKey == LogicalKeyboardKey.arrowUp) {
+        if (navigationBarFocusNode.hasFocus) {
+          screenFocusNode.parent!.parent?.children
+              .last // children.last is used for handling "playlists" screen in library. Under CustomNavigator 2 screens appears.
+              .nextFocus(); // nextFocus is used instead of requestFocus because it focuses on last, bottom, non-visible tile of main page
         }
       }
-      // After visiting text field, something goes wrong and KeyDown events are not sent, only KeyUp-s.
-      // Focus moving works only on KeyDown events, so here we simulate keys handling as it's done in Flutter
-      if (textFieldVisited && event is RawKeyUpEvent) {
-        //Map<LogicalKeySet, Intent> shortcuts = ShortcutRegistry.maybeOf(context).shortcuts;
-        //final BuildContext primaryContext = primaryFocus?.context;
-        //Intent intent = shortcuts[LogicalKeySet(event.logicalKey)];
-        //if (intent != null) {
-          //Actions.invoke(primaryContext, intent);
-        //}
-        // WA for "Search field -> navigator -> UP -> DOWN" case. Prevents focus hanging.
-        FocusNode newFocus = FocusManager.instance.primaryFocus;
-        if (newFocus is FocusScopeNode) {
-          navigationBarFocusNode.requestFocus();
-        }
-      }
-    };
+    }
   }
 
   void focusToNavbar(FocusScopeNode navigatorFocusNode) {
     navigatorFocusNode.requestFocus();
-    navigatorFocusNode.focusInDirection(TraversalDirection.down); // If player bar is hidden, focus won't be visible, so go down once more
+    navigatorFocusNode.focusInDirection(TraversalDirection
+        .down); // If player bar is hidden, focus won't be visible, so go down once more
   }
 
   @override
   Widget build(BuildContext context) {
-    FocusScopeNode navigationBarFocusNode = FocusScopeNode(); // for bottom navigation bar
-    FocusNode screenFocusNode = FocusNode();  // for CustomNavigator
-           
-    return RawKeyboardListener(
-        focusNode: FocusNode(),
-        onKey: _handleKey(navigationBarFocusNode, screenFocusNode),
-        child: Scaffold(
-            bottomNavigationBar:
-                FocusScope(
+    FocusScopeNode navigationBarFocusNode =
+        FocusScopeNode(); // for bottom navigation bar
+    FocusNode screenFocusNode = FocusNode(); // for CustomNavigator
+    screenFocusNode.requestFocus();
+
+    return FutureBuilder(
+      future: _initialization,
+      builder: (context, snapshot) {
+        // Check _initialization status
+        if (snapshot.connectionState == ConnectionState.done) {
+          // When _initialization is done, render app
+          return KeyboardListener(
+              focusNode: FocusNode(),
+              onKeyEvent: (event) =>
+                  _handleKey(event, navigationBarFocusNode, screenFocusNode),
+              child: Scaffold(
+                bottomNavigationBar: FocusScope(
                     node: navigationBarFocusNode,
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: <Widget>[
-                        PlayerBar(),
+                        const PlayerBar(),
                         BottomNavigationBar(
-                          backgroundColor: Theme.of(context).bottomAppBarColor,
+                          backgroundColor:
+                              Theme.of(context).bottomAppBarTheme.color,
                           currentIndex: _selected,
-                          onTap: (int s) async {
+                          onTap: (int index) async {
                             //Pop all routes until home screen
-                            while (navigatorKey.currentState.canPop()) {
-                              await navigatorKey.currentState.maybePop();
+                            while (customNavigatorKey.currentState!.canPop()) {
+                              await customNavigatorKey.currentState!.maybePop();
                             }
 
-                            await navigatorKey.currentState.maybePop();
+                            await customNavigatorKey.currentState!.maybePop();
+
                             setState(() {
-                              _selected = s;
+                              _selected = index;
                             });
 
                             //Fix statusbar
-                            SystemChrome.setSystemUIOverlayStyle(SystemUiOverlayStyle(
+                            SystemChrome.setSystemUIOverlayStyle(
+                                const SystemUiOverlayStyle(
                               statusBarColor: Colors.transparent,
                             ));
                           },
                           selectedItemColor: Theme.of(context).primaryColor,
                           items: <BottomNavigationBarItem>[
                             BottomNavigationBarItem(
-                              icon: Icon(Icons.home),
-                              label: 'Home'.i18n),
+                                icon: const Icon(Icons.home),
+                                label: 'Home'.i18n),
                             BottomNavigationBarItem(
-                              icon: Icon(Icons.search),
+                              icon: const Icon(Icons.search),
                               label: 'Search'.i18n,
                             ),
                             BottomNavigationBarItem(
-                              icon: Icon(Icons.library_music),
-                              label: 'Library'.i18n
-                            )
+                                icon: const Icon(Icons.library_music),
+                                label: 'Library'.i18n)
                           ],
                         )
                       ],
                     )),
-            body: AudioServiceWidget(
-              child: CustomNavigator(
-                navigatorKey: navigatorKey,
-                home: Focus(
-                    focusNode: screenFocusNode,
-                    skipTraversal: true,
-                    canRequestFocus: false,
-                    child: _screens[_selected]
-                ),
-                pageRoute: PageRoutes.materialPageRoute
-              ),
-            )));
+                body: CustomNavigator(
+                    navigatorKey: customNavigatorKey,
+                    home: Focus(
+                        focusNode: screenFocusNode,
+                        skipTraversal: true,
+                        canRequestFocus: false,
+                        child: _screens[_selected]),
+                    pageRoute: PageRoutes.materialPageRoute),
+              ));
+        } else {
+          // While audio_service is initializing
+          return Scaffold(
+            body: Center(
+              child: CircularProgressIndicator(color: Theme.of(context).primaryColor,),
+            ),
+          );
+        }
+      },
+    );
   }
 }

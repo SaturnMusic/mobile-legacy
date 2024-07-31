@@ -6,6 +6,7 @@ import android.app.Service;
 import android.content.ContentValues;
 import android.content.Context;
 import android.content.Intent;
+import android.content.pm.PackageManager;
 import android.database.Cursor;
 import android.database.sqlite.SQLiteDatabase;
 import android.net.Uri;
@@ -17,8 +18,8 @@ import android.os.Message;
 import android.os.Messenger;
 import android.os.RemoteException;
 import android.util.Log;
-import android.util.Pair;
 
+import androidx.core.app.ActivityCompat;
 import androidx.core.app.NotificationCompat;
 import androidx.core.app.NotificationManagerCompat;
 
@@ -34,11 +35,13 @@ import java.io.OutputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.nio.channels.FileChannel;
-import java.nio.file.Files;
-import java.nio.file.StandardCopyOption;
 import java.text.DecimalFormat;
 import java.util.ArrayList;
+
 import javax.net.ssl.HttpsURLConnection;
+
+import s.s.saturn.models.Lyrics;
+import s.s.saturn.models.LyricsClassic;
 
 public class DownloadService extends Service {
 
@@ -73,7 +76,8 @@ public class DownloadService extends Service {
     Handler progressUpdateHandler = new Handler();
     DownloadLog logger = new DownloadLog();
 
-    public DownloadService() { }
+    public DownloadService() {
+    }
 
     @Override
     public void onCreate() {
@@ -140,12 +144,12 @@ public class DownloadService extends Service {
         db.beginTransaction();
 
         //Clear downloaded tracks
-        for (int i=threads.size() - 1; i>=0; i--) {
+        for (int i = threads.size() - 1; i >= 0; i--) {
             Download.DownloadState state = threads.get(i).download.state;
             if (state == Download.DownloadState.NONE || state == Download.DownloadState.DONE || state == Download.DownloadState.ERROR || state == Download.DownloadState.DEEZER_ERROR) {
                 Download d = threads.get(i).download;
                 //Update in queue
-                for (int j=0; j<downloads.size(); j++) {
+                for (int j = 0; j < downloads.size(); j++) {
                     if (downloads.get(j).id == d.id) {
                         downloads.set(j, d);
                     }
@@ -174,7 +178,7 @@ public class DownloadService extends Service {
         //Create new download tasks
         if (running) {
             int nThreads = settings.downloadThreads - threads.size();
-            for (int i = 0; i<nThreads; i++) {
+            for (int i = 0; i < nThreads; i++) {
                 for (int j = 0; j < downloads.size(); j++) {
                     if (downloads.get(j).state == Download.DownloadState.NONE) {
                         //Update download
@@ -191,7 +195,7 @@ public class DownloadService extends Service {
                 }
             }
             //Check if last download
-            if (threads.size() == 0) {
+            if (threads.isEmpty()) {
                 running = false;
             }
         }
@@ -206,7 +210,7 @@ public class DownloadService extends Service {
         b.putBoolean("running", running);
         //Get count of not downloaded tracks
         int queueSize = 0;
-        for (int i=0; i<downloads.size(); i++) {
+        for (int i = 0; i < downloads.size(); i++) {
             if (downloads.get(i).state == Download.DownloadState.NONE)
                 queueSize++;
         }
@@ -219,10 +223,10 @@ public class DownloadService extends Service {
         updateRequests.add(true);
         if (!updating) {
             updating = true;
-            while (updateRequests.size() > 0) {
+            while (!updateRequests.isEmpty()) {
                 updateQueue();
                 //Because threading
-                if (updateRequests.size() > 0)
+                if (!updateRequests.isEmpty())
                     updateRequests.remove(0);
             }
         }
@@ -240,7 +244,7 @@ public class DownloadService extends Service {
             int downloadId = cursor.getInt(0);
             Download.DownloadState state = Download.DownloadState.values()[cursor.getInt(1)];
             boolean skip = false;
-            for (int i=0; i<downloads.size(); i++) {
+            for (int i = 0; i < downloads.size(); i++) {
                 if (downloads.get(i).id == downloadId) {
                     if (downloads.get(i).state != state) {
                         //Different state, update state, only for finished/error
@@ -264,7 +268,7 @@ public class DownloadService extends Service {
     //Stop downloads
     private void stop() {
         running = false;
-        for (int i=0; i<threads.size(); i++) {
+        for (int i = 0; i < threads.size(); i++) {
             threads.get(i).stopDownload();
         }
         updateState();
@@ -279,8 +283,9 @@ public class DownloadService extends Service {
         JSONObject trackJson;
         JSONObject albumJson;
         JSONObject privateJson;
-        JSONObject lyricsData = null;
+        Lyrics lyricsData = null;
         boolean stopDownload = false;
+
         DownloadThread(Download download) {
             this.download = download;
         }
@@ -295,21 +300,18 @@ public class DownloadService extends Service {
                 deezer.authorize();
 
             while (deezer.authorizing)
-                try {Thread.sleep(50);} catch (Exception ignored) {}
+                try {
+                    Thread.sleep(50);
+                } catch (Exception ignored) {
+                }
 
             //Don't fetch meta if user uploaded mp3
             if (!download.isUserUploaded()) {
                 try {
-                    JSONObject privateRaw = deezer.callGWAPI("deezer.pageTrack", "{\"sng_id\": \"" + download.trackId + "\"}");
-                    privateJson = privateRaw.getJSONObject("results").getJSONObject("DATA");
-                    if (privateRaw.getJSONObject("results").has("LYRICS")) {
-                        lyricsData = privateRaw.getJSONObject("results").getJSONObject("LYRICS");
-                    }
-                    trackJson = Deezer.callPublicAPI("track", download.trackId);
-                    albumJson = Deezer.callPublicAPI("album", Integer.toString(trackJson.getJSONObject("album").getInt("id")));
-
+                    trackJson = deezer.callPublicAPI("track", download.trackId);
+                    albumJson = deezer.callPublicAPI("album", Integer.toString(trackJson.getJSONObject("album").getInt("id")));
                 } catch (Exception e) {
-                    logger.error("Unable to fetch track and album metadata! " + e.toString(), download);
+                    logger.error("Unable to fetch track and album metadata! " + e, download);
                     e.printStackTrace();
                     download.state = Download.DownloadState.ERROR;
                     exit();
@@ -318,7 +320,7 @@ public class DownloadService extends Service {
             }
 
             //Fallback
-            Deezer.QualityInfo qualityInfo = new Deezer.QualityInfo(this.download.quality, this.download.trackId, this.download.md5origin, this.download.mediaVersion, logger);
+            Deezer.QualityInfo qualityInfo = new Deezer.QualityInfo(this.download.quality, this.download.streamTrackId, this.download.trackToken, this.download.md5origin, this.download.mediaVersion, logger);
             String sURL = null;
             if (!download.isUserUploaded()) {
                 try {
@@ -373,6 +375,7 @@ public class DownloadService extends Service {
 
             //Temporary encrypted file
             File tmpFile = new File(getCacheDir(), download.id + ".ENC");
+
             //Get start bytes offset
             long start = 0;
             if (tmpFile.exists()) {
@@ -413,7 +416,8 @@ public class DownloadService extends Service {
                             inputStream.close();
                             outputStream.close();
                             connection.disconnect();
-                        } catch (Exception ignored) {}
+                        } catch (Exception ignored) {
+                        }
                         exit();
                         return;
                     }
@@ -440,7 +444,8 @@ public class DownloadService extends Service {
             if (qualityInfo.encrypted) {
                 try {
                     File decFile = new File(tmpFile.getPath() + ".DEC");
-                    deezer.decryptFile(download.trackId, tmpFile.getPath(), decFile.getPath());
+                    DeezerDecryptor decryptor = new DeezerDecryptor(download.streamTrackId);
+                    decryptor.decryptFile(tmpFile.getPath(), decFile.getPath());
                     tmpFile.delete();
                     tmpFile = decFile;
                 } catch (Exception e) {
@@ -459,7 +464,14 @@ public class DownloadService extends Service {
             }
 
             //Create dirs and copy
-            parentDir.mkdirs();
+            if (!parentDir.exists() && !parentDir.mkdirs()) {
+                //Log & Exit
+                logger.error("Couldn't create output folder: " + parentDir.getPath() + "! ", download);
+                download.state = Download.DownloadState.ERROR;
+                exit();
+                return;
+            }
+
             if (!tmpFile.renameTo(outFile)) {
                 try {
                     //Copy file
@@ -477,7 +489,8 @@ public class DownloadService extends Service {
                     try {
                         outFile.delete();
                         tmpFile.delete();
-                    } catch (Exception ignored) {}
+                    } catch (Exception ignored) {
+                    }
                     //Log & Exit
                     logger.error("Error moving file! " + outFile.getPath() + ", " + e.toString(), download);
                     e.printStackTrace();
@@ -513,16 +526,40 @@ public class DownloadService extends Service {
                         inputStream.close();
                         outputStream.close();
                         connection.disconnect();
-                    } catch (Exception ignored) {}
+                    } catch (Exception ignored) {
+                    }
 
                 } catch (Exception e) {
                     logger.error("Error downloading cover! " + e.toString(), download);
                     e.printStackTrace();
                 }
 
-                //Lyrics
-                if (lyricsData != null) {
-                    if (settings.downloadLyrics) {
+                //Lyrics (fetch only when requested)
+                if (settings.downloadLyrics || settings.tags.lyrics) {
+                    try {
+                        lyricsData = deezer.getlyricsNew(download.trackId);
+
+                        if (!lyricsData.isLoaded()) {
+                            if (lyricsData.getErrorMessage() != null) {
+                                logger.error("Error getting lyrics from Pipe API: " + lyricsData.getErrorMessage(), download);
+                                logger.warn("Trying classic API for lyrics");
+                            }
+
+                            JSONObject privateRaw = deezer.callGWAPI("deezer.pageTrack", "{\"sng_id\": \"" + download.trackId + "\"}");
+                            privateJson = privateRaw.getJSONObject("results").getJSONObject("DATA");
+                            if (privateRaw.getJSONObject("results").has("LYRICS")) {
+                                lyricsData = new LyricsClassic(privateRaw.getJSONObject("results").getJSONObject("LYRICS"));
+                            }
+                        }
+                    } catch (Exception e) {
+                        logger.error("Unable to fetch lyrics data! " + e, download);
+                    }
+                }
+
+                if (settings.downloadLyrics) {
+                    if (lyricsData == null || !lyricsData.isSynced()){
+                       logger.warn("No synched lyrics for track, skipping lyrics file" , download);
+                    } else {
                         try {
                             String lrcData = Deezer.generateLRC(lyricsData, trackJson);
                             //Create file
@@ -592,7 +629,8 @@ public class DownloadService extends Service {
                     inputStream.close();
                     outputStream.close();
                     connection.disconnect();
-                } catch (Exception ignored) {}
+                } catch (Exception ignored) {
+                }
                 //Create .nomedia to not spam gallery
                 if (settings.nomediaFiles)
                     new File(parentDir, ".nomedia").createNewFile();
@@ -617,7 +655,7 @@ public class DownloadService extends Service {
     //500ms loop to update notifications and UI
     private void createProgressUpdateHandler() {
         progressUpdateHandler.postDelayed(() -> {
-                updateProgress();
+            updateProgress();
             createProgressUpdateHandler();
         }, 500);
     }
@@ -628,7 +666,7 @@ public class DownloadService extends Service {
             //Convert threads to bundles, send to activity;
             Bundle b = new Bundle();
             ArrayList<Bundle> down = new ArrayList<>();
-            for (int i=0; i<threads.size(); i++) {
+            for (int i = 0; i < threads.size(); i++) {
                 //Create bundle
                 Download download = threads.get(i).download;
                 down.add(createProgressBundle(download));
@@ -667,7 +705,7 @@ public class DownloadService extends Service {
         if (download.state == Download.DownloadState.DOWNLOADING) {
             if (download.filesize <= 0) download.filesize = 1;
             notificationBuilder.setContentText(String.format("%s / %s", formatFilesize(download.received), formatFilesize(download.filesize)));
-            notificationBuilder.setProgress(100, (int)((download.received / (float)download.filesize)*100), false);
+            notificationBuilder.setProgress(100, (int) ((download.received / (float) download.filesize) * 100), false);
         }
 
         //Indeterminate on PostProcess
@@ -677,7 +715,10 @@ public class DownloadService extends Service {
             notificationBuilder.setProgress(1, 1, true);
         }
 
-        notificationManager.notify(NOTIFICATION_ID_START + download.id, notificationBuilder.build());
+        if (ActivityCompat.checkSelfPermission(this, android.Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED) {
+            notificationManager.notify(NOTIFICATION_ID_START + download.id, notificationBuilder.build());
+        }
+
     }
 
     //https://stackoverflow.com/questions/3263892/format-file-size-as-mb-gb-etc
@@ -705,7 +746,7 @@ public class DownloadService extends Service {
                 //Start/Resume
                 case SERVICE_START_DOWNLOAD:
                     running = true;
-                    if (downloads.size() == 0)
+                    if (downloads.isEmpty())
                         loadDownloads();
                     updateQueue();
                     updateState();
@@ -715,6 +756,7 @@ public class DownloadService extends Service {
                 case SERVICE_SETTINGS_UPDATE:
                     settings = DownloadSettings.fromBundle(msg.getData());
                     deezer.arl = settings.arl;
+                    deezer.contentLanguage = settings.deezerLanguage;
                     break;
 
                 //Stop downloads
@@ -816,9 +858,11 @@ public class DownloadService extends Service {
         boolean nomediaFiles;
         String artistSeparator;
         int albumArtResolution;
+        String deezerLanguage = "en";
+        String deezerCountry = "US";
         SelectedTags tags;
 
-        private DownloadSettings(int downloadThreads, boolean overwriteDownload, boolean downloadLyrics, boolean trackCover, String arl, boolean albumCover, boolean nomediaFiles, String artistSeparator, int albumArtResolution, SelectedTags tags) {
+        private DownloadSettings(int downloadThreads, boolean overwriteDownload, boolean downloadLyrics, boolean trackCover, String arl, boolean albumCover, boolean nomediaFiles, String artistSeparator, int albumArtResolution, String deezerLanguage, String deezerCountry, SelectedTags tags) {
             this.downloadThreads = downloadThreads;
             this.overwriteDownload = overwriteDownload;
             this.downloadLyrics = downloadLyrics;
@@ -828,6 +872,8 @@ public class DownloadService extends Service {
             this.nomediaFiles = nomediaFiles;
             this.artistSeparator = artistSeparator;
             this.albumArtResolution = albumArtResolution;
+            this.deezerLanguage = deezerLanguage;
+            this.deezerCountry = deezerCountry;
             this.tags = tags;
         }
 
@@ -846,6 +892,8 @@ public class DownloadService extends Service {
                     json.getBoolean("nomediaFiles"),
                     json.getString("artistSeparator"),
                     json.getInt("albumArtResolution"),
+                    json.getString("deezerLanguage"),
+                    json.getString("deezerCountry"),
                     new SelectedTags(json.getJSONArray("tags"))
                 );
             } catch (Exception e) {
@@ -913,10 +961,11 @@ public class DownloadService extends Service {
                             albumArt = true; break;
                     }
                 }
-            } catch (Exception e) {}
+            } catch (Exception e) {
+                //Shouldn't happen
+                Log.e("ERR", "Error toggling tag: " +  e.toString());
+            }
         }
     }
-
-
 }
 

@@ -12,6 +12,7 @@ import java.io.InputStream;
 import java.io.RandomAccessFile;
 import java.net.URL;
 import java.util.HashMap;
+import java.util.Objects;
 
 import javax.net.ssl.HttpsURLConnection;
 import fi.iki.elonen.NanoHTTPD;
@@ -21,13 +22,11 @@ public class StreamServer {
     public HashMap<String, StreamInfo> streams = new HashMap<>();
 
     private WebServer server;
-    private String host = "127.0.0.1";
-    private int port = 36958;
-    private String offlinePath;
+    private final String offlinePath;
 
     //Shared log & API
-    private DownloadLog logger;
-    private Deezer deezer;
+    private final DownloadLog logger;
+    private final Deezer deezer;
     private boolean authorized = false;
 
     StreamServer(String arl, String offlinePath) {
@@ -41,6 +40,8 @@ public class StreamServer {
     //Create server
     void start() {
         try {
+            String host = "127.0.0.1";
+            int port = 36958;
             server = new WebServer(host, port);
             server.start();
         } catch (Exception e) {
@@ -54,7 +55,7 @@ public class StreamServer {
     }
 
     //Information about streamed audio - for showing in UI
-    public class StreamInfo {
+    public static class StreamInfo {
         String format;
         long size;
         //"Stream" or "Offline"
@@ -88,38 +89,42 @@ public class StreamServer {
             if (session.getMethod() != Method.GET)
                 return newFixedLengthResponse(Response.Status.METHOD_NOT_ALLOWED, MIME_PLAINTEXT, "Only GET request supported!");
 
-            //Parse range header
-            String rangeHeader = session.getHeaders().get("range");
-            int startBytes = 0;
-            boolean isRanged = false;
-            int end = -1;
-            if (rangeHeader != null && rangeHeader.startsWith("bytes")) {
-                isRanged = true;
-                String[] ranges = rangeHeader.split("=")[1].split("-");
-                startBytes = Integer.parseInt(ranges[0]);
-                if (ranges.length > 1 && !ranges[1].equals(" ")) {
-                    end = Integer.parseInt(ranges[1]);
+            try {
+                //Parse range header
+                String rangeHeader = session.getHeaders().get("range");
+                int startBytes = 0;
+                boolean isRanged = false;
+                int end = -1;
+                if (rangeHeader != null && rangeHeader.startsWith("bytes")) {
+                    isRanged = true;
+                    String[] ranges = rangeHeader.split("=")[1].split("-");
+                    startBytes = Integer.parseInt(ranges[0]);
+                    if (ranges.length > 1 && !ranges[1].equals(" ")) {
+                        end = Integer.parseInt(ranges[1]);
+                    }
                 }
-            }
 
-            //Check query parameters
-            if (session.getParameters().keySet().size() < 4) {
-                //Play offline
-                if (session.getParameters().get("id") != null) {
-                    return offlineStream(session, startBytes, end, isRanged);
+                //Check query parameters
+                if (session.getParameters().keySet().size() < 6) {
+                    //Play offline
+                    if (session.getParameters().get("id") != null) {
+                        return offlineStream(session, startBytes, end, isRanged);
+                    }
+                    //Missing QP
+                    return newFixedLengthResponse(Response.Status.INTERNAL_ERROR, MIME_PLAINTEXT, "Invalid / Missing QP");
                 }
-                //Missing QP
-                return newFixedLengthResponse(Response.Status.INTERNAL_ERROR, MIME_PLAINTEXT, "Invalid / Missing QP");
+
+                //Stream
+                return deezerStream(session, startBytes, end, isRanged);
+            } catch (Exception e) {
+                e.printStackTrace();
+                return newFixedLengthResponse(Response.Status.INTERNAL_ERROR, MIME_PLAINTEXT, "An error occurred while serving the request.");
             }
-
-            //Stream
-            return deezerStream(session, startBytes, end, isRanged);
-
         }
 
         private Response offlineStream(IHTTPSession session, int startBytes, int end, boolean isRanged) {
             //Get path
-            String trackId = session.getParameters().get("id").get(0);
+            String trackId = Objects.requireNonNull(session.getParameters().get("id")).get(0);
             File file = new File(offlinePath, trackId);
             long size = file.length();
             //Read header
@@ -132,7 +137,8 @@ public class StreamServer {
                 if (new String(buffer).equals("fLaC"))
                     isFlac = true;
             } catch (Exception e) {
-                return newFixedLengthResponse(Response.Status.INTERNAL_ERROR, MIME_PLAINTEXT, "Invalid file!");
+                Log.d("StreamServer", "Invalid offline file: " + e.getMessage());
+                return newFixedLengthResponse(Response.Status.INTERNAL_ERROR, MIME_PLAINTEXT, "Invalid offline file!");
             }
             //Open file
             RandomAccessFile randomAccessFile;
@@ -140,6 +146,7 @@ public class StreamServer {
                 randomAccessFile = new RandomAccessFile(file, "r");
                 randomAccessFile.seek(startBytes);
             } catch (Exception e) {
+                Log.d("StreamServer", "Failed getting offline data: " + e.getMessage());
                 return newFixedLengthResponse(Response.Status.INTERNAL_ERROR, MIME_PLAINTEXT, "Failed getting data!");
             }
 
@@ -183,10 +190,11 @@ public class StreamServer {
 
             //Get QP into Quality Info
             Deezer.QualityInfo qualityInfo = new Deezer.QualityInfo(
-                    Integer.parseInt(session.getParameters().get("q").get(0)),
-                    session.getParameters().get("id").get(0),
-                    session.getParameters().get("md5origin").get(0),
-                    session.getParameters().get("mv").get(0),
+                    Integer.parseInt(Objects.requireNonNull(session.getParameters().get("q")).get(0)),
+                    Objects.requireNonNull(session.getParameters().get("streamTrackId")).get(0),
+                    Objects.requireNonNull(session.getParameters().get("trackToken")).get(0),
+                    Objects.requireNonNull(session.getParameters().get("md5origin")).get(0),
+                    Objects.requireNonNull(session.getParameters().get("mv")).get(0),
                     logger
             );
             //Fallback
@@ -223,7 +231,7 @@ public class StreamServer {
                 // Encrypted response
                 if (qualityInfo.encrypted) {
                     //Get decryption key
-                    final byte[] key = Deezer.getKey(qualityInfo.trackId);
+                    final byte[] key = DeezerDecryptor.getKey(qualityInfo.trackId);
 
                     outResponse = newFixedLengthResponse(
                             isRanged ? Response.Status.PARTIAL_CONTENT : Response.Status.OK,
@@ -253,9 +261,9 @@ public class StreamServer {
                                         System.arraycopy(buffer, 0, b, off, totalRead);
                                         return totalRead;
                                     }
-                                    //Decrypt
+                                    //Decrypt every 3rd full chunk
                                     if ((counter % 3) == 0) {
-                                        buffer = Deezer.decryptChunk(key, buffer);
+                                        buffer = DeezerDecryptor.decryptChunk(key, buffer);
                                     }
                                     //Drop bytes from rounding to 2048
                                     if (drop > 0) {
@@ -291,8 +299,8 @@ public class StreamServer {
                 }
                 outResponse.addHeader("Accept-Ranges", "bytes");
 
-                //Save stream info, use original track id
-                streams.put(session.getParameters().get("id").get(0), new StreamInfo(
+                //Save stream info, use original track id since this is used to communicate with Flutter UI
+                streams.put(Objects.requireNonNull(session.getParameters().get("id")).get(0), new StreamInfo(
                         ((qualityInfo.quality == 9) ? "FLAC" : "MP3"),
                         deezerStart + connection.getContentLength(),
                         "Stream"

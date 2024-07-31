@@ -24,11 +24,14 @@ public class DownloadsDatabase extends SQLiteOpenHelper {
         md5origin - MD5Origin,
         mediaVersion - MediaVersion
         title - Download/Track name, for display,
-        image - URL to art (for display)
+        image - URL to art (for display),
+        trackToken - Track Token for Hi-Fi download,
+        streamTrackId - Track ID for the stream (differs from track ID when using FALLBACK stream)
         */
 
-        db.execSQL("CREATE TABLE Downloads (id INTEGER PRIMARY KEY AUTOINCREMENT, " +
-            "path TEXT, private INTEGER, quality INTEGER, state INTEGER, trackId TEXT, md5origin TEXT, mediaVersion TEXT, title TEXT, image TEXT);");
+        db.execSQL("CREATE TABLE Downloads (id INTEGER PRIMARY KEY AUTOINCREMENT, path TEXT, " +
+                "private INTEGER, quality INTEGER, state INTEGER, trackId TEXT, md5origin TEXT, " +
+                "mediaVersion TEXT, title TEXT, image TEXT, trackToken TEXT, streamTrackId TEXT);");
     }
 
 

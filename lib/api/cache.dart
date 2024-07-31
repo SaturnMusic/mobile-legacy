@@ -1,28 +1,27 @@
-import 'package:Saturn/api/definitions.dart';
-import 'package:Saturn/api/deezer.dart';
-import 'package:json_annotation/json_annotation.dart';
-import 'package:path_provider/path_provider.dart';
-import 'package:path/path.dart' as p;
-
-import 'dart:io';
-import 'dart:convert';
 import 'dart:async';
+import 'dart:convert';
+import 'dart:io';
 
+import 'package:json_annotation/json_annotation.dart';
+import 'package:path/path.dart' as p;
+import 'package:path_provider/path_provider.dart';
+
+import '../api/definitions.dart';
 
 part 'cache.g.dart';
 
-Cache cache;
+late Cache cache;
 
 //Cache for miscellaneous things
 @JsonSerializable()
 class Cache {
-
   //ID's of tracks that are in library
-  List<String> libraryTracks = [];
+  List<String>? libraryTracks = [];
 
   //Track ID of logged track, to prevent duplicates
-  @JsonKey(ignore: true)
-  String loggedTrackId;
+  @JsonKey(includeFromJson: false)
+  @JsonKey(includeToJson: false)
+  String? loggedTrackId;
 
   @JsonKey(defaultValue: [])
   List<Track> history = [];
@@ -32,62 +31,60 @@ class Cache {
   List<Sorting> sorts = [];
 
   //Sleep timer
-  @JsonKey(ignore: true)
-  DateTime sleepTimerTime;
-  @JsonKey(ignore: true)
-  StreamSubscription sleepTimer;
+  @JsonKey(includeFromJson: false)
+  @JsonKey(includeToJson: false)
+  DateTime? sleepTimerTime;
+  @JsonKey(includeFromJson: false)
+  @JsonKey(includeToJson: false)
+  StreamSubscription? sleepTimer;
 
   //Search history
   @JsonKey(name: 'searchHistory2', toJson: _searchHistoryToJson, fromJson: _searchHistoryFromJson)
-  List<SearchHistoryItem> searchHistory;
+  List<SearchHistoryItem>? searchHistory;
 
   //If download threads warning was shown
   @JsonKey(defaultValue: false)
-  bool threadsWarning;
+  bool threadsWarning = false;
 
   //Last time update check
   @JsonKey(defaultValue: 0)
-  int lastUpdateCheck;
+  int? lastUpdateCheck;
 
-  @JsonKey(ignore: true)
+  @JsonKey(includeFromJson: false)
+  @JsonKey(includeToJson: false)
   bool wakelock = false;
 
   Cache({this.libraryTracks});
 
   //Wrapper to test if track is favorite against cache
-  Future<bool> checkTrackFavorite(Track t) async {
-      //LOAD FAVORITE TRACKS INTO CACHE
-    Future<List<Track>> futureTracks = deezerAPI.playlistTracksPage(deezerAPI.favoritesPlaylistId, 0);
-    List<Track> tracks = await futureTracks;
-    for (Track track in tracks) {
-      cache.libraryTracks.add(track.id); // add track id to cached favorites
-    }
-    if (t.favorite != null && t.favorite) return true;
-    if (libraryTracks == null || libraryTracks.length == 0) return false;
-    return libraryTracks.contains(t.id);
+  bool checkTrackFavorite(Track t) {
+    if ((t.favorite ?? false)) return true;
+    if (libraryTracks == null || libraryTracks!.isEmpty) return false;
+    return libraryTracks!.contains(t.id);
   }
-
-
 
   //Add to history
   void addToSearchHistory(dynamic item) async {
-    if (searchHistory == null)
-      searchHistory = [];
+    searchHistory ??= [];
 
     // Remove duplicate
-    int i = searchHistory.indexWhere((e) => e.data.id == item.id);
+    int i = searchHistory!.indexWhere((e) => e.data.id == item.id);
     if (i != -1) {
-      searchHistory.removeAt(i);
+      searchHistory!.removeAt(i);
     }
 
-    if (item is Track)
-      searchHistory.add(SearchHistoryItem(item, SearchHistoryItemType.TRACK));
-    if (item is Album)
-      searchHistory.add(SearchHistoryItem(item, SearchHistoryItemType.ALBUM));
-    if (item is Artist)
-      searchHistory.add(SearchHistoryItem(item, SearchHistoryItemType.ARTIST));
-    if (item is Playlist)
-      searchHistory.add(SearchHistoryItem(item, SearchHistoryItemType.PLAYLIST));
+    if (item is Track) {
+      searchHistory!.add(SearchHistoryItem(item, SearchHistoryItemType.TRACK));
+    }
+    if (item is Album) {
+      searchHistory!.add(SearchHistoryItem(item, SearchHistoryItemType.ALBUM));
+    }
+    if (item is Artist) {
+      searchHistory!.add(SearchHistoryItem(item, SearchHistoryItemType.ARTIST));
+    }
+    if (item is Playlist) {
+      searchHistory!.add(SearchHistoryItem(item, SearchHistoryItemType.PLAYLIST));
+    }
 
     await save();
   }
@@ -98,7 +95,10 @@ class Cache {
   }
 
   static Future wipe() async {
-    await File(await getPath()).delete();
+    String cacheFilePath = await Cache.getPath();
+    if (await File(cacheFilePath).exists()) {
+      await File(cacheFilePath).delete();
+    }
   }
 
   static Future<Cache> load() async {
@@ -109,12 +109,17 @@ class Cache {
       await c.save();
       return c;
     }
-    return Cache.fromJson(jsonDecode(await file.readAsString()));
+    Map<String, dynamic> cacheJson = {};
+    String fileContent = await file.readAsString();
+    if (fileContent.isNotEmpty) {
+      cacheJson = jsonDecode(fileContent);
+    }
+    return Cache.fromJson(cacheJson);
   }
 
   Future save() async {
     File file = File(await Cache.getPath());
-    file.writeAsString(jsonEncode(this.toJson()));
+    file.writeAsString(jsonEncode(toJson()));
   }
 
   //JSON
@@ -122,9 +127,10 @@ class Cache {
   Map<String, dynamic> toJson() => _$CacheToJson(this);
 
   //Search History JSON
-  static List<SearchHistoryItem> _searchHistoryFromJson(List<dynamic> json) {
-    return (json??[]).map<SearchHistoryItem>((i) => _searchHistoryItemFromJson(i)).toList();
+  static List<SearchHistoryItem> _searchHistoryFromJson(List<dynamic>? json) {
+    return (json ?? []).map<SearchHistoryItem>((i) => _searchHistoryItemFromJson(i)).toList();
   }
+
   static SearchHistoryItem _searchHistoryItemFromJson(Map<String, dynamic> json) {
     SearchHistoryItemType type = SearchHistoryItemType.values[json['type']];
     dynamic data;
@@ -144,7 +150,9 @@ class Cache {
     }
     return SearchHistoryItem(data, type);
   }
-  static List<Map<String, dynamic>> _searchHistoryToJson(List<SearchHistoryItem> data) => (data??[]).map<Map<String, dynamic>>((i) => {"type": i.type.index, "data": i.data.toJson()}).toList();
+
+  static List<Map<String, dynamic>> _searchHistoryToJson(List<SearchHistoryItem>? data) =>
+      (data ?? []).map<Map<String, dynamic>>((i) => {'type': i.type.index, 'data': i.data.toJson()}).toList();
 }
 
 @JsonSerializable()
@@ -155,10 +163,4 @@ class SearchHistoryItem {
   SearchHistoryItem(this.data, this.type);
 }
 
-
-enum SearchHistoryItemType {
-  TRACK,
-  ALBUM,
-  ARTIST,
-  PLAYLIST
-}
+enum SearchHistoryItemType { TRACK, ALBUM, ARTIST, PLAYLIST }

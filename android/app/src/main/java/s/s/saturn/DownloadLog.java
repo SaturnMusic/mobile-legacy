@@ -6,8 +6,10 @@ import android.util.Log;
 import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileWriter;
+import java.text.DateFormat;
 import java.text.SimpleDateFormat;
 import java.util.Calendar;
+import java.util.Locale;
 
 public class DownloadLog {
 
@@ -36,7 +38,7 @@ public class DownloadLog {
     }
 
     String time() {
-        SimpleDateFormat format = new SimpleDateFormat("yyyy.MM.dd HH:mm:ss");
+        SimpleDateFormat format = new SimpleDateFormat("yyyy.MM.dd HH:mm:ss", Locale.US);
         return format.format(Calendar.getInstance().getTime());
     }
 

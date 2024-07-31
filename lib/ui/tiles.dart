@@ -1,54 +1,62 @@
-import 'package:audio_service/audio_service.dart';
-import 'package:flutter/material.dart';
-import 'package:fluttericon/octicons_icons.dart';
-import 'package:Saturn/api/deezer.dart';
-import 'package:Saturn/api/download.dart';
-import 'package:Saturn/translations.i18n.dart';
-
-import '../api/definitions.dart';
-import 'cached_image.dart';
-
 import 'dart:async';
 
+import 'package:flutter/material.dart';
+import 'package:fluttericon/octicons_icons.dart';
+import 'package:get_it/get_it.dart';
+
+import '../api/deezer.dart';
+import '../api/definitions.dart';
+import '../api/download.dart';
+import '../service/audio_service.dart';
+import '../translations.i18n.dart';
+import 'cached_image.dart';
 
 class TrackTile extends StatefulWidget {
-
   final Track track;
-  final Function onTap;
-  final Function onHold;
-  final Widget trailing;
+  final VoidCallback? onTap;
+  final VoidCallback? onHold;
+  final Widget? trailing;
 
-  TrackTile(this.track, {this.onTap, this.onHold, this.trailing, Key key}): super(key: key);
+  const TrackTile(this.track,
+      {this.onTap, this.onHold, this.trailing, super.key});
 
   @override
   _TrackTileState createState() => _TrackTileState();
 }
 
 class _TrackTileState extends State<TrackTile> {
-
-  StreamSubscription _subscription;
+  StreamSubscription? _mediaItemSub;
   bool _isOffline = false;
+  bool nowPlaying = false;
 
-  bool get nowPlaying {
-    if (AudioService.currentMediaItem == null) return false;
-    return AudioService.currentMediaItem.id == widget.track.id;
-  }
+  /*bool get nowPlaying {
+    if (GetIt.I<AudioPlayerHandler>().mediaItem.value == null) return false;
+    return GetIt.I<AudioPlayerHandler>().mediaItem.value!.id == widget.track.id;
+  }*/
 
   @override
   void initState() {
     //Listen to media item changes, update text color if currently playing
-    _subscription = AudioService.currentMediaItemStream.listen((event) {
-      setState(() {});
+    _mediaItemSub = GetIt.I<AudioPlayerHandler>().mediaItem.listen((item) {
+      if (mounted) {
+        setState(() {
+          nowPlaying = widget.track.id == item?.id;
+        });
+      }
     });
     //Check if offline
-    downloadManager.checkOffline(track: widget.track).then((b) => setState(() => _isOffline = b));
+    downloadManager.checkOffline(track: widget.track).then((b) {
+      if (mounted) {
+        setState(() => _isOffline = b);
+      }
+    });
 
     super.initState();
   }
 
   @override
   void dispose() {
-    if (_subscription != null) _subscription.cancel();
+    _mediaItemSub?.cancel();
     super.dispose();
   }
 
@@ -56,19 +64,18 @@ class _TrackTileState extends State<TrackTile> {
   Widget build(BuildContext context) {
     return ListTile(
       title: Text(
-        widget.track.title,
+        widget.track.title ?? '',
         maxLines: 1,
         overflow: TextOverflow.clip,
         style: TextStyle(
-          color: nowPlaying?Theme.of(context).primaryColor:null
-        ),
+            color: nowPlaying ? Theme.of(context).primaryColor : null),
       ),
       subtitle: Text(
-        widget.track.artistString,
+        widget.track.artistString ?? '',
         maxLines: 1,
       ),
       leading: CachedImage(
-        url: widget.track.albumArt.thumb,
+        url: widget.track.albumArt?.thumb ?? '',
         width: 48,
       ),
       onTap: widget.onTap,
@@ -76,8 +83,8 @@ class _TrackTileState extends State<TrackTile> {
       trailing: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          if ((_isOffline??false))
-            Padding(
+          if (_isOffline)
+            const Padding(
               padding: EdgeInsets.symmetric(horizontal: 2.0),
               child: Icon(
                 Octicons.primitive_dot,
@@ -85,24 +92,22 @@ class _TrackTileState extends State<TrackTile> {
                 size: 12.0,
               ),
             ),
-          if (widget.track.explicit??false)
-            Padding(
+          if (widget.track.explicit ?? false)
+            const Padding(
               padding: EdgeInsets.symmetric(horizontal: 2.0),
               child: Text(
                 'E',
-                style: TextStyle(
-                  color: Colors.red
-                ),
+                style: TextStyle(color: Colors.red),
               ),
             ),
-          Container(
+          SizedBox(
             width: 42.0,
             child: Text(
-              widget.track.durationString,
+              widget.track.durationString ?? '',
               textAlign: TextAlign.center,
             ),
           ),
-          widget.trailing??Container(width: 0, height: 0)
+          widget.trailing ?? const SizedBox(width: 0, height: 0)
         ],
       ),
     );
@@ -110,27 +115,27 @@ class _TrackTileState extends State<TrackTile> {
 }
 
 class AlbumTile extends StatelessWidget {
-
   final Album album;
-  final Function onTap;
-  final Function onHold;
-  final Widget trailing;
+  final VoidCallback? onTap;
+  final VoidCallback? onHold;
+  final Widget? trailing;
 
-  AlbumTile(this.album, {this.onTap, this.onHold, this.trailing});
+  const AlbumTile(this.album,
+      {super.key, this.onTap, this.onHold, this.trailing});
 
   @override
   Widget build(BuildContext context) {
     return ListTile(
       title: Text(
-        album.title,
+        album.title ?? '',
         maxLines: 1,
       ),
       subtitle: Text(
-        album.artistString,
+        album.artistString ?? '',
         maxLines: 1,
       ),
       leading: CachedImage(
-        url: album.art.thumb,
+        url: album.art?.thumb ?? '',
         width: 48,
       ),
       onTap: onTap,
@@ -141,71 +146,71 @@ class AlbumTile extends StatelessWidget {
 }
 
 class ArtistTile extends StatelessWidget {
-
   final Artist artist;
-  final Function onTap;
-  final Function onHold;
+  final VoidCallback? onTap;
+  final VoidCallback? onHold;
 
-  ArtistTile(this.artist, {this.onTap, this.onHold});
+  const ArtistTile(this.artist, {super.key, this.onTap, this.onHold});
 
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      width: 150,
-      child: Container(
+        width: 150,
         child: InkWell(
           onTap: onTap,
           onLongPress: onHold,
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: <Widget>[
-              Container(height: 4,),
+              Container(
+                height: 4,
+              ),
               CachedImage(
-                url: artist.picture.thumb,
+                url: artist.picture?.thumb ?? '',
                 circular: true,
                 width: 100,
               ),
-              Container(height: 8,),
+              Container(
+                height: 8,
+              ),
               Text(
-                artist.name,
+                artist.name ?? '',
                 maxLines: 1,
                 textAlign: TextAlign.center,
                 overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  fontSize: 14.0
-                ),
+                style: const TextStyle(fontSize: 14.0),
               ),
-              Container(height: 4,),
+              Container(
+                height: 4,
+              ),
             ],
           ),
-        ),
-      )
-    );
+        ));
   }
 }
 
 class PlaylistTile extends StatelessWidget {
-
   final Playlist playlist;
-  final Function onTap;
-  final Function onHold;
-  final Widget trailing;
+  final VoidCallback? onTap;
+  final VoidCallback? onHold;
+  final Widget? trailing;
 
-  PlaylistTile(this.playlist, {this.onHold, this.onTap, this.trailing});
+  const PlaylistTile(this.playlist,
+      {super.key, this.onHold, this.onTap, this.trailing});
 
   String get subtitle {
-    if (playlist.user == null || playlist.user.name == null || playlist.user.name == '' || playlist.user.id == deezerAPI.userId) {
+    if (playlist.user?.name == '' || playlist.user?.id == deezerAPI.userId) {
       if (playlist.trackCount == null) return '';
       return '${playlist.trackCount} ' + 'Tracks'.i18n;
     }
-    return playlist.user.name;
+    return playlist.user?.name ?? '';
   }
 
   @override
   Widget build(BuildContext context) {
     return ListTile(
       title: Text(
-        playlist.title,
+        playlist.title ?? '',
         maxLines: 1,
       ),
       subtitle: Text(
@@ -213,7 +218,7 @@ class PlaylistTile extends StatelessWidget {
         maxLines: 1,
       ),
       leading: CachedImage(
-        url: playlist.image.thumb,
+        url: playlist.image?.thumb ?? '',
         width: 48,
       ),
       onTap: onTap,
@@ -224,25 +229,25 @@ class PlaylistTile extends StatelessWidget {
 }
 
 class ArtistHorizontalTile extends StatelessWidget {
-
   final Artist artist;
-  final Function onTap;
-  final Function onHold;
-  final Widget trailing;
+  final VoidCallback? onTap;
+  final VoidCallback? onHold;
+  final Widget? trailing;
 
-  ArtistHorizontalTile(this.artist, {this.onHold, this.onTap, this.trailing});
+  const ArtistHorizontalTile(this.artist,
+      {super.key, this.onHold, this.onTap, this.trailing});
 
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: EdgeInsets.symmetric(vertical: 2.0),
+      padding: const EdgeInsets.symmetric(vertical: 2.0),
       child: ListTile(
         title: Text(
-          artist.name,
+          artist.name ?? '',
           maxLines: 1,
         ),
         leading: CachedImage(
-          url: artist.picture.thumb,
+          url: artist.picture?.thumb ?? '',
           circular: true,
         ),
         onTap: onTap,
@@ -254,114 +259,111 @@ class ArtistHorizontalTile extends StatelessWidget {
 }
 
 class PlaylistCardTile extends StatelessWidget {
-
   final Playlist playlist;
-  final Function onTap;
-  final Function onHold;
-  PlaylistCardTile(this.playlist, {this.onTap, this.onHold});
+  final VoidCallback? onTap;
+  final VoidCallback? onHold;
+  const PlaylistCardTile(this.playlist, {super.key, this.onTap, this.onHold});
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      height: 180.0,
-      child: InkWell(
-        onTap: onTap,
-        onLongPress: onHold,
-        child: Column(
-          children: <Widget>[
-            Padding(
-              padding: EdgeInsets.all(8),
-              child: CachedImage(
-                url: playlist.image.thumb,
-                width: 128,
-                height: 128,
-                rounded: true,
+    return SizedBox(
+        height: 180.0,
+        child: InkWell(
+          onTap: onTap,
+          onLongPress: onHold,
+          child: Column(
+            children: <Widget>[
+              Padding(
+                padding: const EdgeInsets.all(8),
+                child: CachedImage(
+                  url: playlist.image?.thumb ?? '',
+                  width: 128,
+                  height: 128,
+                  rounded: true,
+                ),
               ),
-            ),
-            Container(height: 2.0),
-            Container(
-              width: 144,
-              child: Text(
-                playlist.title,
-                maxLines: 1,
-                textAlign: TextAlign.center,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(fontSize: 14.0),
+              Container(height: 2.0),
+              SizedBox(
+                width: 144,
+                child: Text(
+                  playlist.title ?? '',
+                  maxLines: 1,
+                  textAlign: TextAlign.center,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(fontSize: 14.0),
+                ),
               ),
-            ),
-            Container(height: 4.0,)
-          ],
-        ),
-      )
-    );
+              Container(
+                height: 4.0,
+              )
+            ],
+          ),
+        ));
   }
 }
 
-
 class SmartTrackListTile extends StatelessWidget {
-
   final SmartTrackList smartTrackList;
-  final Function onTap;
-  final Function onHold;
-  SmartTrackListTile(this.smartTrackList, {this.onHold, this.onTap});
+  final VoidCallback? onTap;
+  final VoidCallback? onHold;
+  const SmartTrackListTile(this.smartTrackList,
+      {super.key, this.onHold, this.onTap});
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      height: 210.0,
+    return SizedBox(
+      height: 212.0,
       child: InkWell(
         onTap: onTap,
         onLongPress: onHold,
         child: Column(
           children: <Widget>[
             Padding(
-              padding: EdgeInsets.all(8.0),
-              child: Stack(
-                children: [
-                  CachedImage(
-                    width: 128,
-                    height: 128,
-                    url: smartTrackList.cover.thumb,
-                    rounded: true,
-                  ),
-                  Container(
-                    width: 128.0,
-                    child: Padding(
-                      padding: EdgeInsets.symmetric(horizontal: 8.0, vertical: 6.0),
-                      child: Text(
-                        smartTrackList.title,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                            fontSize: 18.0,
-                            shadows: [
-                              Shadow(
-                                offset: Offset(1, 1),
-                                blurRadius: 2,
-                                color: Colors.black
-                              )
-                            ],
-                          color: Colors.white
+                padding: const EdgeInsets.all(8.0),
+                child: Stack(
+                  children: [
+                    CachedImage(
+                      width: 128,
+                      height: 128,
+                      url: smartTrackList.cover?.thumb ?? '',
+                      rounded: true,
+                    ),
+                    SizedBox(
+                      width: 128.0,
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 8.0, vertical: 6.0),
+                        child: Text(
+                          smartTrackList.title ?? '',
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                              fontSize: 18.0,
+                              shadows: [
+                                Shadow(
+                                    offset: Offset(1, 1),
+                                    blurRadius: 2,
+                                    color: Colors.black)
+                              ],
+                              color: Colors.white),
                         ),
                       ),
-                    ),
-                  )
-                ],
-              )
-            ),
-            Container(
+                    )
+                  ],
+                )),
+            SizedBox(
               width: 144.0,
               child: Text(
-                smartTrackList.subtitle,
+                smartTrackList.subtitle ?? '',
                 maxLines: 3,
                 textAlign: TextAlign.center,
                 overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  fontSize: 14.0
-                ),
+                style: const TextStyle(fontSize: 14.0),
               ),
             ),
-            Container(height: 8.0,)
+            Container(
+              height: 8.0,
+            )
           ],
         ),
       ),
@@ -369,238 +371,252 @@ class SmartTrackListTile extends StatelessWidget {
   }
 }
 
-class FlowTile extends StatelessWidget {
-
-  final FlowHandler Flow;
-  final Function onTap;
-  final Function onHold;
-  FlowTile(this.Flow, {this.onHold, this.onTap});
+class FlowTrackListTile extends StatelessWidget {
+  final DeezerFlow deezerFlow;
+  final VoidCallback? onTap;
+  final VoidCallback? onHold;
+  const FlowTrackListTile(this.deezerFlow,
+      {super.key, this.onHold, this.onTap});
 
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      width: 150,
-      child: Container(
-      child: InkWell(
-        onTap: onTap,
-        onLongPress: onHold,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: <Widget>[
-            Container(height: 4,),
-                  CachedImage(
-                    width: 100,
-                    height: 100,
-                    url: Flow.cover.thumb,
-                    
-                    circular: true,
-                  ),
-                  Container(height: 8,),
-                  Text(
-                      Flow.title,
-                      maxLines: 1,
-                      textAlign: TextAlign.center,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        fontSize: 14.0
-                   ),
+        width: 150,
+        child: InkWell(
+          onTap: onTap,
+          onLongPress: onHold,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: <Widget>[
+              Container(
+                height: 4,
               ),
-              Container(height: 4,),
+              CachedImage(
+                url: deezerFlow.cover?.thumb ?? '',
+                circular: true,
+                width: 100,
+              ),
+              Container(
+                height: 8,
+              ),
+              Text(
+                deezerFlow.title ?? '',
+                maxLines: 1,
+                textAlign: TextAlign.center,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(fontSize: 14.0),
+              ),
+              Container(
+                height: 4,
+              ),
             ],
           ),
-        ),
-      )
-    );
+        ));
   }
 }
 
 class AlbumCard extends StatelessWidget {
-
   final Album album;
-  final Function onTap;
-  final Function onHold;
+  final VoidCallback? onTap;
+  final VoidCallback? onHold;
 
-  AlbumCard(this.album, {this.onTap, this.onHold});
+  const AlbumCard(this.album, {super.key, this.onTap, this.onHold});
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      child: InkWell(
-        onTap: onTap,
-        onLongPress: onHold,
-        child: Column(
-          children: <Widget>[
-            Padding(
-              padding: EdgeInsets.all(8.0),
-              child: CachedImage(
+    return InkWell(
+      onTap: onTap,
+      onLongPress: onHold,
+      child: Column(
+        children: <Widget>[
+          Padding(
+            padding: const EdgeInsets.all(8.0),
+            child: CachedImage(
                 width: 128.0,
                 height: 128.0,
-                url: album.art.thumb,
-                rounded: true
-              ),
+                url: album.art?.thumb ?? '',
+                rounded: true),
+          ),
+          SizedBox(
+            width: 144.0,
+            child: Text(
+              album.title ?? '',
+              maxLines: 1,
+              textAlign: TextAlign.center,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(fontSize: 14.0),
             ),
-            Container(
-              width: 144.0,
-              child: Text(
-                album.title,
-                maxLines: 1,
-                textAlign: TextAlign.center,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                    fontSize: 14.0
-                ),
-              ),
-            ),
-            Container(height: 4.0),
-            Container(
-              width: 144.0,
-              child: Text(
-                album.artistString,
-                maxLines: 1,
-                textAlign: TextAlign.center,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
+          ),
+          Container(height: 4.0),
+          SizedBox(
+            width: 144.0,
+            child: Text(
+              album.artistString ?? '',
+              maxLines: 1,
+              textAlign: TextAlign.center,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
                   fontSize: 12.0,
-                  color: (Theme.of(context).brightness == Brightness.light) ? Colors.grey[800] : Colors.white70
-                ),
-              ),
+                  color: (Theme.of(context).brightness == Brightness.light)
+                      ? Colors.grey[800]
+                      : Colors.white70),
             ),
-            Container(height: 8.0,)
-          ],
-        ),
-      )
+          ),
+          Container(
+            height: 8.0,
+          )
+        ],
+      ),
     );
   }
 }
 
 class ChannelTile extends StatelessWidget {
-
   final DeezerChannel channel;
-  final Function onTap;
-  ChannelTile(this.channel, {this.onTap});
+  final VoidCallback? onTap;
+  const ChannelTile(this.channel, {super.key, this.onTap});
 
   Color _textColor() {
-    double luminance = channel.backgroundColor.computeLuminance();
-    return (luminance>0.5)?Colors.black:Colors.white;
+    if (channel.backgroundImage == null) {
+      double luminance = channel.backgroundColor!.computeLuminance();
+      return (luminance > 0.5) ? Colors.black : Colors.white;
+    } else {
+      // Deezer website seems to always use white for title over logo image
+      return Colors.white;
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: EdgeInsets.symmetric(horizontal: 4.0),
+      padding: const EdgeInsets.symmetric(horizontal: 4.0),
       child: Card(
-        color: channel.backgroundColor,
+        color: channel.backgroundImage == null ? channel.backgroundColor : null,
         child: InkWell(
-          onTap: this.onTap,
-          child: Container(
-            width: 150,
+          onTap: onTap,
+          child: SizedBox(
+            width: 148,
             height: 75,
             child: Center(
-              child: Text(
-                channel.title,
-                textAlign: TextAlign.center,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                    fontSize: 18.0,
-                    fontWeight: FontWeight.bold,
-                    color: _textColor()
+                child: Stack(
+              children: [
+                if (channel.backgroundImage != null)
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(5), // Adjust the radius as needed
+                  child: CachedImage(
+                    url: channel.backgroundImage?.customUrl('134', '264', quality: '100') ?? '',
+                    width: 150,
+                    height: 75,
+                  ),
                 ),
-              ),
-            ),
+                if (channel.logoImage != null)
+                  CachedImage(
+                    url: channel.logoImage?.thumbUrl ?? '',
+                    width: 150,
+                    height: 75,
+                  ),
+                if (channel.title != null && channel.logo == null)
+                  Center(
+                      child: Text(
+                    channel.title!,
+                    textAlign: TextAlign.center,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                        fontSize: 18.0,
+                        fontWeight: FontWeight.bold,
+                        color: _textColor()),
+                  ))
+              ],
+            )),
           ),
-        )
+        ),
       ),
     );
   }
 }
 
 class ShowCard extends StatelessWidget {
-
   final Show show;
-  final Function onTap;
-  final Function onHold;
+  final VoidCallback? onTap;
+  final VoidCallback? onHold;
 
-  ShowCard(this.show, {this.onTap, this.onHold});
+  const ShowCard(this.show, {super.key, this.onTap, this.onHold});
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      height: 180.0,
-      child: InkWell(
-        onTap: onTap,
-        onLongPress: onHold,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Padding(
-              padding: EdgeInsets.all(8.0),
-              child: CachedImage(
-                url: show.art.thumb,
-                width: 128.0,
-                height: 128.0,
-                rounded: true,
-              ),
+    return SizedBox(
+    height: 180.0,
+    child: InkWell(
+      onTap: onTap,
+      onLongPress: onHold,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Padding(
+            padding: const EdgeInsets.all(8.0),
+            child: CachedImage(
+              url: show.art?.thumb ?? '',
+              width: 128.0,
+              height: 128.0,
+              rounded: true,
             ),
-            Container(
-              width: 144.0,
-              child: Text(
-                show.name,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 14.0
-                ),
-              ),
+          ),
+          SizedBox(
+            width: 144.0,
+            child: Text(
+              show.name ?? '',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              textAlign: TextAlign.center,
+              style: const TextStyle(fontSize: 14.0),
             ),
-          ],
-        ),
+          ),
+        ],
       ),
+    ),
     );
   }
 }
 
 class ShowTile extends StatelessWidget {
-
   final Show show;
-  final Function onTap;
-  final Function onHold;
+  final VoidCallback? onTap;
+  final VoidCallback? onHold;
 
-  ShowTile(this.show, {this.onTap, this.onHold});
+  const ShowTile(this.show, {super.key, this.onTap, this.onHold});
 
   @override
   Widget build(BuildContext context) {
     return ListTile(
       title: Text(
-        show.name,
+        show.name ?? '',
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
       ),
       subtitle: Text(
-        show.description,
+        show.description ?? '',
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
       ),
       onTap: onTap,
       onLongPress: onHold,
       leading: CachedImage(
-        url: show.art.thumb,
+        url: show.art?.thumb ?? '',
         width: 48,
       ),
     );
   }
 }
 
-
 class ShowEpisodeTile extends StatelessWidget {
-
   final ShowEpisode episode;
-  final Function onTap;
-  final Function onHold;
-  final Widget trailing;
+  final VoidCallback? onTap;
+  final VoidCallback? onHold;
+  final Widget? trailing;
 
-  ShowEpisodeTile(this.episode, {this.onTap, this.onHold, this.trailing});
+  const ShowEpisodeTile(this.episode,
+      {super.key, this.onTap, this.onHold, this.trailing});
 
   @override
   Widget build(BuildContext context) {
@@ -611,22 +627,25 @@ class ShowEpisodeTile extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           ListTile(
-            title: Text(episode.title, maxLines: 2),
+            title: Text(episode.title ?? '', maxLines: 2),
             trailing: trailing,
           ),
           Padding(
-            padding: EdgeInsets.symmetric(horizontal: 16.0),
+            padding: const EdgeInsets.symmetric(horizontal: 16.0),
             child: Text(
-              episode.description,
+              episode.description ?? '',
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
               style: TextStyle(
-                color: Theme.of(context).textTheme.subtitle1.color.withOpacity(0.9)
-              ),
+                  color: Theme.of(context)
+                      .textTheme
+                      .titleMedium
+                      ?.color
+                      ?.withOpacity(0.9)),
             ),
           ),
           Padding(
-            padding: EdgeInsets.fromLTRB(16, 8.0, 0, 0),
+            padding: const EdgeInsets.fromLTRB(16, 8.0, 0, 0),
             child: Row(
               mainAxisSize: MainAxisSize.max,
               children: [
@@ -634,15 +653,18 @@ class ShowEpisodeTile extends StatelessWidget {
                   '${episode.publishedDate} | ${episode.durationString}',
                   textAlign: TextAlign.left,
                   style: TextStyle(
-                    fontSize: 12.0,
-                    fontWeight: FontWeight.bold,
-                    color: Theme.of(context).textTheme.subtitle1.color.withOpacity(0.6)
-                  ),
+                      fontSize: 12.0,
+                      fontWeight: FontWeight.bold,
+                      color: Theme.of(context)
+                          .textTheme
+                          .titleMedium
+                          ?.color
+                          ?.withOpacity(0.6)),
                 ),
               ],
             ),
           ),
-          Divider(),
+          const Divider(),
         ],
       ),
     );

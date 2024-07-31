@@ -1,112 +1,117 @@
+import 'dart:convert';
 import 'dart:io';
 
-import 'package:flutter/cupertino.dart';
+import 'package:collection/collection.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
-import 'package:Saturn/api/cache.dart';
-import 'package:Saturn/api/download.dart';
-import 'package:Saturn/ui/elements.dart';
-import 'package:Saturn/translations.i18n.dart';
-import 'package:Saturn/ui/error.dart';
 import 'package:http/http.dart' as http;
-import 'package:open_file/open_file.dart';
-import 'package:package_info/package_info.dart';
-import 'package:path_provider/path_provider.dart';
+import 'package:open_filex/open_filex.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import 'package:path/path.dart' as p;
-import 'dart:convert';
+import 'package:path_provider/path_provider.dart';
 import 'package:permission_handler/permission_handler.dart';
 
-import 'package:version/version.dart';
-import 'package:flutter/services.dart';
+import '../api/cache.dart';
+import '../api/download.dart';
+import '../translations.i18n.dart';
+import '../ui/elements.dart';
+import '../ui/error.dart';
+import '../utils/version.dart';
 
 class UpdaterScreen extends StatefulWidget {
+  const UpdaterScreen({super.key});
+
   @override
   _UpdaterScreenState createState() => _UpdaterScreenState();
 }
 
 class _UpdaterScreenState extends State<UpdaterScreen> {
-
-  static const platform = const MethodChannel('s.s.saturn/native');
-
   bool _loading = true;
   bool _error = false;
-  freezerVersions _versions;
-  String _current;
-  String _arch;
+  FreezerVersions? _versions;
+  String? _current;
+  String? _arch;
   double _progress = 0.0;
   bool _buttonEnabled = true;
 
   Future<void> _checkInstallPackagesPermission() async {
-    try {
-      final bool result = await platform.invokeMethod('checkInstallPackagesPermission');
-      if (!result) {
-        _requestInstallPackagesPermission();
+    if (await Permission.requestInstallPackages.isDenied) {
+      final status = await Permission.requestInstallPackages.request();
+      if (!status.isGranted) {
+        throw Exception('Permission to install packages not granted');
       }
-    } on PlatformException catch (e) {
-      print("Failed to check install packages permission: '${e.message}'.");
     }
   }
 
-  Future<void> _requestInstallPackagesPermission() async {
-    try {
-      await platform.invokeMethod('requestInstallPackagesPermission');
-    } on PlatformException catch (e) {
-      print("Failed to request install packages permission: '${e.message}'.");
-    }
-  }
-
-  Future _load() async {
-    //Load current version
+  Future<void> _load() async {
+    // Load current version
     PackageInfo info = await PackageInfo.fromPlatform();
     setState(() => _current = info.version);
 
-    //Get architecture
-    _arch = await DownloadManager.platform.invokeMethod("arch");
-    if (_arch == 'armv8l')
-      _arch = 'arm32';
+    // Get architecture
+    _arch = await DownloadManager.platform.invokeMethod('arch');
+    if (_arch == 'armv8l') _arch = 'arm32';
 
-    //Load from website
+    // Load from website
     try {
-      freezerVersions versions = await freezerVersions.fetch();
+      FreezerVersions versions = await FreezerVersions.fetch();
       setState(() {
         _versions = versions;
         _loading = false;
       });
     } catch (e, st) {
-      print(e + st);
-      _error = true;
-      _loading = false;
+      if (kDebugMode) {
+        print(e.toString() + st.toString());
+      }
+      setState(() {
+        _error = true;
+        _loading = false;
+      });
     }
   }
 
-  freezerDownload get _versionDownload {
-    return _versions.versions[0].downloads.firstWhere((d) => d.version.toLowerCase().contains(_arch.toLowerCase()), orElse: () => null);
+  FreezerDownload? get _versionDownload {
+    return _versions?.versions[0].downloads.firstWhere((d) => d.version.toLowerCase().contains(_arch!.toLowerCase()));
   }
 
-  Future _download() async {
-    await _checkInstallPackagesPermission(); // Check and request permission if needed
-    String url = _versionDownload.directUrl;
-    //Start request
-    http.Client client = new http.Client();
-    http.StreamedResponse res = await client.send(http.Request('GET', Uri.parse(url)));
-    int size = res.contentLength;
-    //Open file
-    String path = p.join((await getExternalStorageDirectory()).path, 'update.apk');
-    File file = File(path);
-    IOSink fileSink = file.openWrite();
-    //Update progress
-    Future.doWhile(() async {
-      int received = await file.length();
-      setState(() => _progress = received/size);
-      return received != size;
-    });
-    //Pipe
-    await res.stream.pipe(fileSink);
-    fileSink.close();
-    debugPrint(path); 
-    OpenFile.open(path);
+  Future<void> _download() async {
+    try {
+      await _checkInstallPackagesPermission();
 
-    setState(() => _buttonEnabled = true);
+      String? url = _versionDownload?.directUrl;
+      if (url == null) {
+        print("No URL available for download");
+        return;
+      }
+
+      // Start request
+      http.Client client = http.Client();
+      http.StreamedResponse res = await client.send(http.Request('GET', Uri.parse(url)));
+      int? size = res.contentLength;
+
+      // Open file
+      String path = p.join((await getExternalStorageDirectory())!.path, 'update.apk');
+      File file = File(path);
+      IOSink fileSink = file.openWrite();
+
+      // Update progress
+      Future.doWhile(() async {
+        int received = await file.length();
+        setState(() => _progress = received / size!.toInt());
+        return received != size;
+      });
+
+      // Pipe
+      await res.stream.pipe(fileSink);
+      await fileSink.close();
+
+      OpenFilex.open(path);
+      setState(() => _buttonEnabled = true);
+    } catch (e) {
+      print('Error during download: $e');
+      setState(() => _buttonEnabled = true);
+    }
   }
 
   @override
@@ -118,195 +123,165 @@ class _UpdaterScreenState extends State<UpdaterScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: freezerAppBar('Updates'.i18n),
-      body: ListView(
-        children: [
-
-          if (_error)
-            ErrorScreen(),
-
-          if (_loading)
-            Padding(
-              padding: EdgeInsets.all(8.0),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [CircularProgressIndicator(color: Theme.of(context).primaryColor,)],
-              ),
-            ),
-
-          if (!_error && !_loading && Version.parse(_versions.latest) <= Version.parse(_current))
-            Center(
-              child: Padding(
+        appBar: FreezerAppBar('Updates'.i18n),
+        body: ListView(
+          children: [
+            if (_error) const ErrorScreen(),
+            if (_loading)
+              Padding(
                 padding: EdgeInsets.all(8.0),
-                child: Text(
-                  'You are running latest version!'.i18n,
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: 26.0
-                  )
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [CircularProgressIndicator(color: Theme.of(context).primaryColor,)],
                 ),
-              )
-            ),
-
-          if (!_error && !_loading && Version.parse(_versions.latest) > Version.parse(_current))
-            Column(
-              children: [
-                Padding(
-                  padding: EdgeInsets.all(8.0),
-                  child: Text(
-                    'New update available!'.i18n + ' ' + _versions.latest,
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                        fontSize: 20.0,
-                        fontWeight: FontWeight.bold
+              ),
+            if (!_error &&
+                !_loading &&
+                Version.parse((_versions?.latest.toString() ?? '0.0.0')) <= Version.parse(_current!))
+              Center(
+                  child: Padding(
+                padding: const EdgeInsets.all(8.0),
+                child: Text('You are running latest version!'.i18n,
+                    textAlign: TextAlign.center, style: const TextStyle(fontSize: 26.0)),
+              )),
+            if (!_error &&
+                !_loading &&
+                Version.parse((_versions?.latest.toString() ?? '0.0.0')) > Version.parse(_current!))
+              Column(
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.all(8.0),
+                    child: Text(
+                      'New update available!'.i18n + ' ' + _versions!.latest.toString(),
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(fontSize: 20.0, fontWeight: FontWeight.bold),
                     ),
                   ),
-                ),
-                Text(
-                  'Current version: ' + _current,
-                  style: TextStyle(
-                    fontSize: 14.0,
-                    fontStyle: FontStyle.italic
-                  ),
-                ),
-                Container(height: 8.0),
-                freezerDivider(),
-                Container(height: 8.0),
-                Text(
-                  'Changelog',
-                  style: TextStyle(
-                    fontSize: 20.0,
-                    fontWeight: FontWeight.bold
-                  ),
-                ),
-                Padding(
-                  padding: EdgeInsets.fromLTRB(16, 4, 16, 8),
-                  child: Text(
-                    _versions.versions[0].changelog,
-                    style: TextStyle(fontSize: 16.0),
-                  ),
-                ),
-                freezerDivider(),
-                Container(height: 8.0),
-                //Available download
-                if (_versionDownload != null)
-                  Column(children: [
-                    ElevatedButton(
-                      style: ButtonStyle(
-                        backgroundColor: MaterialStatePropertyAll<Color>(Theme.of(context).primaryColor),
-                      ),
-                      child: Text('Download'.i18n + ' (${_versionDownload.version})'),
-                      onPressed: _buttonEnabled ? () {
-                        setState(() => _buttonEnabled = false);
-                        _download();
-                      }:null
-                    ),
-                    Padding(
-                      padding: EdgeInsets.all(8.0),
-                      child: LinearProgressIndicator(value: _progress, color: Theme.of(context).primaryColor,),
-                    )
-                  ]),
-                //Unsupported arch
-                if (_versionDownload == null)
                   Text(
-                    'Unsupported platform!'.i18n + ' $_arch',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(fontSize: 16.0),
-                  )
-              ],
-            )
-        ],
-      )
-    );
+                    'Current version: ' + _current!,
+                    style: const TextStyle(fontSize: 14.0, fontStyle: FontStyle.italic),
+                  ),
+                  Container(height: 8.0),
+                  const FreezerDivider(),
+                  Container(height: 8.0),
+                  const Text(
+                    'Changelog',
+                    style: TextStyle(fontSize: 20.0, fontWeight: FontWeight.bold),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
+                    child: Text(
+                      _versions!.versions[0].changelog,
+                      style: const TextStyle(fontSize: 16.0),
+                    ),
+                  ),
+                  const FreezerDivider(),
+                  Container(height: 8.0),
+                  //Available download
+                  if (_versionDownload != null)
+                    Column(children: [
+                      ElevatedButton(
+                          style: ButtonStyle(
+                            backgroundColor: MaterialStatePropertyAll<Color>(Theme.of(context).primaryColor),
+                          ),
+                          onPressed: _buttonEnabled
+                              ? () {
+                                  setState(() => _buttonEnabled = false);
+                                  _download();
+                                }
+                              : null,
+                          child: Text('Download'.i18n + ' (${_versionDownload?.version})')),
+                      Padding(
+                        padding: const EdgeInsets.all(8.0),
+                        child: LinearProgressIndicator(value: _progress, color: Theme.of(context).primaryColor, backgroundColor: Theme.of(context).dividerColor),
+                      )
+                    ]),
+                  //Unsupported arch
+                  if (_versionDownload == null)
+                    Text(
+                      'Unsupported platform!'.i18n + ' $_arch',
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(fontSize: 16.0),
+                    )
+                ],
+              )
+          ],
+        ));
   }
 }
 
-class freezerVersions {
+class FreezerVersions {
   String latest;
-  List<freezerVersion> versions;
+  List<FreezerVersion> versions;
 
-  freezerVersions({this.latest, this.versions});
+  FreezerVersions({required this.latest, required this.versions});
 
-  factory freezerVersions.fromJson(Map data) => freezerVersions(
-    latest: data['android']['latest'],
-    versions: data['android']['versions'].map<freezerVersion>((v) => freezerVersion.fromJson(v)).toList()
-  );
+  factory FreezerVersions.fromJson(Map data) => FreezerVersions(
+      latest: data['android']['latest'],
+      versions: data['android']['versions'].map<FreezerVersion>((v) => FreezerVersion.fromJson(v)).toList());
 
   //Fetch from website API
-  static Future<freezerVersions> fetch() async {
-    http.Response response = await http.get('https://saturnclient.dev/api/versions');
-//    http.Response response = await http.get('https://freezer.life/api/versions');
-//    http.Response response = await http.get('https://cum.freezerapp.workers.dev/api/versions');
-    return freezerVersions.fromJson(jsonDecode(response.body));
+  static Future<FreezerVersions> fetch() async {
+    http.Response response = await http.get(Uri.parse('https://saturn.kim/api/versions'));
+    return FreezerVersions.fromJson(jsonDecode(response.body));
   }
 
   static Future checkUpdate() async {
     //Check only each 24h
     int updateDelay = 86400000;
-    if ((DateTime.now().millisecondsSinceEpoch - (cache.lastUpdateCheck??0)) < updateDelay) return;
+    if ((DateTime.now().millisecondsSinceEpoch - (cache.lastUpdateCheck ?? 0)) < updateDelay) return;
     cache.lastUpdateCheck = DateTime.now().millisecondsSinceEpoch;
     await cache.save();
 
-    freezerVersions versions = await freezerVersions.fetch();
+    FreezerVersions versions = await FreezerVersions.fetch();
 
     //Load current version
     PackageInfo info = await PackageInfo.fromPlatform();
     if (Version.parse(versions.latest) <= Version.parse(info.version)) return;
 
     //Get architecture
-    String _arch = await DownloadManager.platform.invokeMethod("arch");
-    if (_arch == 'armv8l')
-      _arch = 'arm32';
+    String arch = await DownloadManager.platform.invokeMethod('arch');
+    if (arch == 'armv8l') arch = 'arm32';
     //Check compatible architecture
-    if (versions.versions[0].downloads.firstWhere((d) => d.version.toLowerCase().contains(_arch.toLowerCase()), orElse: () => null) == null) return;
+    var compatibleVersion =
+        versions.versions[0].downloads.firstWhereOrNull((d) => d.version.toLowerCase().contains(arch.toLowerCase()));
+    if (compatibleVersion == null) return;
 
-// Show notification
-  FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin = FlutterLocalNotificationsPlugin();
-  const AndroidInitializationSettings androidInitializationSettings = AndroidInitializationSettings('drawable/ic_logo');
-  final InitializationSettings initializationSettings = InitializationSettings(android: androidInitializationSettings, iOS: null);
-  await flutterLocalNotificationsPlugin.initialize(initializationSettings);
-
-  AndroidNotificationDetails androidNotificationDetails = AndroidNotificationDetails(
-    'freezerupdates', // Channel ID
-    'freezer Updates', // Channel Name
-    'freezer Updates', // Channel Description
-    importance: Importance.high,
-    priority: Priority.high,
-  );
-
-  NotificationDetails notificationDetails = NotificationDetails(android: androidNotificationDetails, iOS: null);
-
-  await flutterLocalNotificationsPlugin.show(
-    0, // Notification ID
-    'New update available!'.i18n, // Notification title
-    'Update to latest version in the settings.'.i18n, // Notification body
-    notificationDetails,
-  );
+    //Show notification
+    FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin = FlutterLocalNotificationsPlugin();
+    const AndroidInitializationSettings androidInitializationSettings =
+        AndroidInitializationSettings('drawable/ic_logo');
+    const InitializationSettings initializationSettings =
+        InitializationSettings(android: androidInitializationSettings);
+    await flutterLocalNotificationsPlugin.initialize(initializationSettings);
+    AndroidNotificationDetails androidNotificationDetails = AndroidNotificationDetails(
+        'freezerupdates', 'Freezer Updates'.i18n,
+        channelDescription: 'Freezer Updates'.i18n);
+    NotificationDetails notificationDetails = NotificationDetails(android: androidNotificationDetails);
+    await flutterLocalNotificationsPlugin.show(
+        0, 'New update available!'.i18n, 'Update to latest version in the settings.'.i18n, notificationDetails);
   }
 }
 
-class freezerVersion {
+class FreezerVersion {
   String version;
   String changelog;
-  List<freezerDownload> downloads;
+  List<FreezerDownload> downloads;
 
-  freezerVersion({this.version, this.changelog, this.downloads});
+  FreezerVersion({required this.version, required this.changelog, required this.downloads});
 
-  factory freezerVersion.fromJson(Map data) => freezerVersion(
-    version: data['version'],
-    changelog: data['changelog'],
-    downloads: data['downloads'].map<freezerDownload>((d) => freezerDownload.fromJson(d)).toList()
-  );
+  factory FreezerVersion.fromJson(Map data) => FreezerVersion(
+      version: data['version'],
+      changelog: data['changelog'],
+      downloads: data['downloads'].map<FreezerDownload>((d) => FreezerDownload.fromJson(d)).toList());
 }
 
-class freezerDownload {
+class FreezerDownload {
   String version;
   String directUrl;
 
-  freezerDownload({this.version, this.directUrl});
+  FreezerDownload({required this.version, required this.directUrl});
 
-  factory freezerDownload.fromJson(Map data) => freezerDownload(
-    version: data['version'],
-    directUrl: data['links'].first['url']
-  );
+  factory FreezerDownload.fromJson(Map data) =>
+      FreezerDownload(version: data['version'], directUrl: data['links'].first['url']);
 }
