@@ -1,3 +1,7 @@
+# ❓ Why was this archived?
+#### The following source code is obsolete and no longer in use as we have moved on to a newer codebase
+#### Our new repository can be found [here](https://github.com/SaturnMusic/mobile)
+
 # Saturn Mobile
 ## Freezer Reborn
 ### Your go-to **ToS Compliant** Custom Deezer Client
